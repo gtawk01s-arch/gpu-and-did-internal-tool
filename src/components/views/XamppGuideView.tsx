@@ -521,8 +521,41 @@ app.post('/v1/chat/completions', authenticateCelerkoClient, async (req: Request,
             </div>
 
             <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-              Netlify provides instant global CDN hosting with automated SSL certificates. A pre-configured <strong className="font-mono text-cyan-500">netlify.toml</strong> file is already included at your repository root to configure single-page app (SPA) rewrites.
+              Netlify provides instant global CDN hosting with automated SSL certificates. A pre-configured <strong className="font-mono text-cyan-500">netlify.toml</strong> file and <strong className="font-mono text-cyan-500">.npmrc</strong> are included at your repository root to guarantee successful builds without peer dependency conflicts.
             </p>
+
+            {/* Quick Fix for Netlify ERESOLVE / esbuild Error */}
+            <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2.5">
+              <div className="flex items-center gap-2 text-amber-400 font-bold text-xs">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>Fixing Netlify Build Error (ERESOLVE / esbuild peer conflict)</span>
+              </div>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                If your Netlify build failed with <code className="text-amber-300 bg-amber-950/60 px-1 py-0.5 rounded font-mono text-[10px]">npm error ERESOLVE: Could not resolve peerOptional esbuild</code>, choose either fix below:
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-800 space-y-1.5 text-[11px]">
+                  <div className="font-semibold text-cyan-400 flex items-center gap-1.5">
+                    <span>Fix 1: Netlify Env Var (Zero Code Change)</span>
+                  </div>
+                  <ol className="list-decimal pl-4 space-y-1 text-slate-300 text-[10px]">
+                    <li>In Netlify dashboard, open <strong>Site settings → Environment variables</strong>.</li>
+                    <li>Add Key: <code className="text-amber-300 font-mono">NPM_FLAGS</code> with Value: <code className="text-emerald-400 font-mono">--legacy-peer-deps</code>.</li>
+                    <li>Go to <strong>Deploys → Trigger deploy → Clear cache and deploy site</strong>.</li>
+                  </ol>
+                </div>
+                <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-800 space-y-1.5 text-[11px]">
+                  <div className="font-semibold text-cyan-400 flex items-center gap-1.5">
+                    <span>Fix 2: Update package.json on GitHub</span>
+                  </div>
+                  <ol className="list-decimal pl-4 space-y-1 text-slate-300 text-[10px]">
+                    <li>Open <code className="text-slate-300 font-mono">package.json</code> on your GitHub repo.</li>
+                    <li>Remove the <code className="text-rose-300 font-mono">"esbuild"</code> line under <code className="font-mono">devDependencies</code> (Vite manages esbuild automatically).</li>
+                    <li>Delete <code className="text-slate-300 font-mono">package-lock.json</code> and commit.</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
 
             {/* Method A: GitHub Integration */}
             <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700/80 space-y-2">

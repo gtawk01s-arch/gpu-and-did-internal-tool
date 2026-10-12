@@ -42,8 +42,7 @@ export const Sidebar: React.FC = () => {
     { id: 'users', label: 'Users & Passwords', icon: Lock },
     { id: 'bonus-tools', label: 'Calculators & Forecast', icon: Sparkles },
     { id: 'database', label: 'SQL Schema & Queries', icon: Database },
-    { id: 'xampp', label: 'Local Run & Netlify Guide', icon: Terminal },
-  ];
+     ];
 
   const handleNavClick = (id: string) => {
     setActiveTab(id);
