@@ -22,6 +22,7 @@ import { MetricCard } from '../common/MetricCard';
 import { StatusBadge } from '../common/StatusBadge';
 import { Client, ResourceRequirement } from '../../types';
 import { ClientProfileModal } from './ClientProfileModal';
+import { formatINR } from '../../data/mockData';
 
 export const ClientsView: React.FC = () => {
   const {
@@ -222,9 +223,9 @@ export const ClientsView: React.FC = () => {
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <MetricCard label="Total Client Accounts" value={clients.length} subValue="Active contracts" badge="Accounts" />
-        <MetricCard label="Monthly Client Billing" value={`$${totalRevenue.toLocaleString()}`} subValue="Gross Run-Rate" highlight badge="Revenue" />
-        <MetricCard label="Wholesale Upstream Cost" value={`$${totalCost.toLocaleString()}`} subValue="Provider Commitments" badge="Cost" />
-        <MetricCard label="Portfolio Spread Margin" value={`${overallMargin}%`} subValue={`+$${(totalRevenue - totalCost).toLocaleString()} Gross Spread`} badge="Margin" />
+        <MetricCard label="Monthly Client Billing" value={formatINR(totalRevenue)} subValue="Gross Run-Rate" highlight badge="Revenue" />
+        <MetricCard label="Wholesale Upstream Cost" value={formatINR(totalCost)} subValue="Provider Commitments" badge="Cost" />
+        <MetricCard label="Portfolio Spread Margin" value={`${overallMargin}%`} subValue={`+${formatINR(totalRevenue - totalCost)} Gross Spread`} badge="Margin" />
       </div>
 
       {/* Dedicated Client Portal URLs & Access Banner */}
@@ -364,7 +365,7 @@ export const ClientsView: React.FC = () => {
                     {client.allocatedDidCount} numbers
                   </td>
                   <td className="py-2.5 px-3 text-right font-mono tabular-nums font-bold text-emerald-600 dark:text-emerald-400">
-                    ${client.monthlySpend.toLocaleString()}/mo
+                    {formatINR(client.monthlySpend)}/mo
                   </td>
                   <td className="py-2.5 px-3">
                     <div className="flex items-center gap-1.5">
@@ -726,7 +727,7 @@ export const ClientsView: React.FC = () => {
                   <option value="">-- Choose GPU Node --</option>
                   {availableGpus.map(g => (
                     <option key={g.id} value={g.id}>
-                      {g.gpuId} — {g.gpuModel} ({g.quantity - g.allocatedQuantity} free at ${g.sellingPrice}/mo)
+                      {g.gpuId} — {g.gpuModel} ({g.quantity - g.allocatedQuantity} free at {formatINR(g.sellingPrice)}/mo)
                     </option>
                   ))}
                 </select>
@@ -773,7 +774,7 @@ export const ClientsView: React.FC = () => {
               Assign DID Number to {quickAllocClient.client.companyName}
             </h3>
             <p className="text-xs text-slate-500 mb-4">
-              Select available E.164 phone number from Telnyx or Bandwidth pool.
+              Select available Indian phone number from Tata, Airtel, Jio, or Vi pool.
             </p>
 
             <form onSubmit={handleQuickDidAllocate} className="space-y-3 text-xs">
@@ -788,7 +789,7 @@ export const ClientsView: React.FC = () => {
                   <option value="">-- Choose DID --</option>
                   {availableDids.map(d => (
                     <option key={d.id} value={d.id}>
-                      {d.didNumber} ({d.country} · {d.provider} · ${d.sellingPrice.toFixed(2)}/mo)
+                      {d.didNumber} ({d.country} · {d.provider} · {formatINR(d.sellingPrice)}/mo)
                     </option>
                   ))}
                 </select>

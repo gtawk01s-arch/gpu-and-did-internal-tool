@@ -20,13 +20,16 @@ import { User, UserRole } from '../../types';
 import { RBAC_MATRIX } from '../../data/mockData';
 
 export const UsersView: React.FC = () => {
-  const { users, createUser, updateUser, toggleUserStatus, currentUser, switchRole } = useApp();
+  const { users, createUser, updateUser, toggleUserStatus, currentUser, switchRole, changeUserPassword } = useApp();
 
   const [activeTab, setActiveTab] = useState<'users' | 'rbac' | 'sessions'>('users');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [resettingUser, setResettingUser] = useState<User | null>(null);
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [resetError, setResetError] = useState<string | null>(null);
   const [resetSuccess, setResetSuccess] = useState(false);
+  const [showBackendProtectedModal, setShowBackendProtectedModal] = useState(false);
 
   const [newUser, setNewUser] = useState<Partial<User>>({
     name: '',
@@ -44,13 +47,42 @@ export const UsersView: React.FC = () => {
     setNewUser({ name: '', email: '', role: 'Operations Manager' });
   };
 
+  const handlePasswordAction = (user: User) => {
+    if (user.role === 'Super Admin' || user.id === 'usr-1') {
+      setShowBackendProtectedModal(true);
+      return;
+    }
+    setResettingUser(user);
+    setNewPassword('');
+    setConfirmPassword('');
+    setResetError(null);
+    setResetSuccess(false);
+  };
+
   const handleResetPasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!resettingUser) return;
+    if (newPassword.length < 8) {
+      setResetError('Password must be at least 8 characters long.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setResetError('Passwords do not match.');
+      return;
+    }
+
+    const res = changeUserPassword(resettingUser.id, newPassword);
+    if (!res.success) {
+      setResetError(res.message);
+      return;
+    }
+
     setResetSuccess(true);
     setTimeout(() => {
       setResetSuccess(false);
       setResettingUser(null);
       setNewPassword('');
+      setConfirmPassword('');
     }, 1500);
   };
 

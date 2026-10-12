@@ -15,6 +15,7 @@ import { useApp } from '../../context/AppContext';
 import { MetricCard } from '../common/MetricCard';
 import { StatusBadge } from '../common/StatusBadge';
 import { PendingRequest } from '../../types';
+import { formatINR } from '../../data/mockData';
 
 export const AllocationsView: React.FC = () => {
   const {
@@ -167,13 +168,13 @@ export const AllocationsView: React.FC = () => {
                         {req.quantity}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-600 dark:text-slate-300">
-                        ${req.monthlyCost.toLocaleString()}/mo
+                        {formatINR(req.monthlyCost)}/mo
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono tabular-nums text-emerald-600 dark:text-emerald-400 font-bold">
-                        ${req.sellingPrice.toLocaleString()}/mo
+                        {formatINR(req.sellingPrice)}/mo
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono tabular-nums text-cyan-600 dark:text-cyan-400 font-semibold">
-                        {margin}% (+${spread.toLocaleString()})
+                        {margin}% (+{formatINR(spread)})
                       </td>
                       <td className="py-2.5 px-3 text-slate-400 font-mono text-[11px]">
                         {req.date}
@@ -296,7 +297,7 @@ export const AllocationsView: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-600 dark:text-slate-300 mb-1 font-medium">Wholesale Cost ($/mo)</label>
+                  <label className="block text-slate-600 dark:text-slate-300 mb-1 font-medium">Wholesale Cost (₹ INR/mo)</label>
                   <input
                     type="number"
                     value={newRequest.monthlyCost}
@@ -305,7 +306,7 @@ export const AllocationsView: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-600 dark:text-slate-300 mb-1 font-medium">Selling Price ($/mo)</label>
+                  <label className="block text-slate-600 dark:text-slate-300 mb-1 font-medium">Selling Price (₹ INR/mo)</label>
                   <input
                     type="number"
                     value={newRequest.sellingPrice}

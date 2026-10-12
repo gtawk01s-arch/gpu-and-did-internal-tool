@@ -22,6 +22,7 @@ import {
 import { useApp } from '../../context/AppContext';
 import { Client } from '../../types';
 import { StatusBadge } from '../common/StatusBadge';
+import { formatINR } from '../../data/mockData';
 
 interface ClientProfileModalProps {
   client: Client;
@@ -252,9 +253,9 @@ export const ClientProfileModal: React.FC<ClientProfileModalProps> = ({ client, 
                       </div>
                       <div className="text-right">
                         <div className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                          ${(g.sellingPrice * g.allocatedQuantity).toLocaleString()}/mo
+                          {formatINR(g.sellingPrice * g.allocatedQuantity)}/mo
                         </div>
-                        <div className="text-[10px] text-slate-400">Wholesale: ${(g.monthlyCost * g.allocatedQuantity).toLocaleString()}/mo</div>
+                        <div className="text-[10px] text-slate-400">Wholesale: {formatINR(g.monthlyCost * g.allocatedQuantity)}/mo</div>
                       </div>
                     </div>
                   ))}
@@ -283,7 +284,7 @@ export const ClientProfileModal: React.FC<ClientProfileModalProps> = ({ client, 
                         <div className="text-[10px] text-slate-400">{d.provider} ({d.country})</div>
                       </div>
                       <div className="text-right">
-                        <div className="text-emerald-600 dark:text-emerald-400">${d.sellingPrice.toFixed(2)}/mo</div>
+                        <div className="text-emerald-600 dark:text-emerald-400">{formatINR(d.sellingPrice)}/mo</div>
                         <div className="text-[10px] text-slate-400">{d.usageMinutes.toLocaleString()} min</div>
                       </div>
                     </div>
@@ -315,7 +316,7 @@ export const ClientProfileModal: React.FC<ClientProfileModalProps> = ({ client, 
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
-                      ${inv.totalAmount.toLocaleString()}
+                      {formatINR(inv.totalAmount)}
                     </span>
                     <StatusBadge status={inv.status} />
                   </div>
@@ -338,7 +339,7 @@ export const ClientProfileModal: React.FC<ClientProfileModalProps> = ({ client, 
                     <div className="text-[11px] text-slate-400">{p.method} · Ref: {p.referenceNumber}</div>
                   </div>
                   <div className="text-right">
-                    <div className="font-bold text-emerald-600 dark:text-emerald-400">${p.amount.toLocaleString()}</div>
+                    <div className="font-bold text-emerald-600 dark:text-emerald-400">{formatINR(p.amount)}</div>
                     <div className="text-[10px] text-slate-400">{p.date}</div>
                   </div>
                 </div>
@@ -378,15 +379,15 @@ export const ClientProfileModal: React.FC<ClientProfileModalProps> = ({ client, 
               <div className="p-4 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/60 font-mono space-y-2 text-xs">
                 <div className="flex justify-between">
                   <span>Gross Monthly Invoiced Revenue:</span>
-                  <span className="font-bold tabular-nums">${client.monthlySpend.toLocaleString()}</span>
+                  <span className="font-bold tabular-nums">{formatINR(client.monthlySpend)}</span>
                 </div>
                 <div className="flex justify-between text-rose-600 dark:text-rose-400">
                   <span>Minus Wholesale Upstream Cost:</span>
-                  <span className="tabular-nums">-${client.monthlyCost.toLocaleString()}</span>
+                  <span className="tabular-nums">-{formatINR(client.monthlyCost)}</span>
                 </div>
                 <div className="border-t border-emerald-300 dark:border-emerald-800 pt-2 flex justify-between font-bold text-sm text-emerald-700 dark:text-emerald-400">
                   <span>Net Wholesale Gross Profit:</span>
-                  <span className="tabular-nums">${profit.toLocaleString()}/mo</span>
+                  <span className="tabular-nums">{formatINR(profit)}/mo</span>
                 </div>
                 <div className="flex justify-between text-cyan-600 dark:text-cyan-400 font-semibold">
                   <span>Gross Resale Margin:</span>

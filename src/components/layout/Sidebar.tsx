@@ -1,18 +1,19 @@
 import React from 'react';
 import {
   LayoutDashboard,
-  Clock,
   Server,
   PhoneCall,
   Users,
+  Building2,
   TrendingUp,
   Receipt,
   Database,
   Sparkles,
   ShieldAlert,
+  ShieldCheck,
   UserCircle2,
-  FolderArchive,
   GitPullRequest,
+  Lock,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -21,29 +22,28 @@ export const Sidebar: React.FC = () => {
 
   const pendingCount = pendingRequests.filter(r => r.status === 'Pending').length;
   const criticalCount = alerts.filter(a => !a.resolved && a.severity === 'Critical').length;
+  const pendingInvoices = 0;
 
   const primaryItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'approvals', label: 'Pending Approvals', icon: GitPullRequest, badge: pendingCount > 0 ? `${pendingCount}` : undefined },
-    { id: 'gpus', label: 'GPU Inventory', icon: Server },
-    { id: 'sips', label: 'SIP & DIDs', icon: PhoneCall },
-    { id: 'clients', label: 'Clients & Allocations', icon: Users },
-    { id: 'client-portal', label: 'Client Panel (Portal)', icon: UserCircle2 },
+    { id: 'approvals', label: 'Resource Approvals', icon: GitPullRequest, badge: pendingCount > 0 ? `${pendingCount}` : undefined },
+    { id: 'gpus', label: 'GPU Clusters', icon: Server },
+    { id: 'sips', label: 'DID & SIP Trunks', icon: PhoneCall },
+    { id: 'clients', label: 'Clients & Accounts', icon: Users },
+    { id: 'providers', label: 'Wholesale Providers', icon: Building2 },
     { id: 'invoices', label: 'Invoices & Billing', icon: Receipt },
-    { id: 'finance', label: 'Profitability', icon: TrendingUp },
+    { id: 'finance', label: 'Profitability & Finance', icon: TrendingUp },
   ];
 
   const secondaryItems = [
-    { id: 'xampp', label: 'XAMPP & MySQL Setup', icon: FolderArchive },
-    { id: 'database', label: 'SQL Schema & Queries', icon: Database },
-    { id: 'alerts', label: 'Alerts', icon: ShieldAlert, badge: criticalCount > 0 ? String(criticalCount) : undefined },
+    { id: 'alerts', label: 'Incidents & Trunk Alerts', icon: ShieldAlert, badge: criticalCount > 0 ? String(criticalCount) : undefined },
+    { id: 'audit', label: 'Audit Logs & IP Trail', icon: ShieldCheck },
+    { id: 'users', label: 'Users & Passwords', icon: Lock },
     { id: 'bonus-tools', label: 'Calculators & Forecast', icon: Sparkles },
+    { id: 'database', label: 'SQL Schema & Queries', icon: Database },
   ];
 
   const handleNavClick = (id: string) => {
-    if (id === 'client-portal') {
-      setIsClientPortalMode(true);
-    }
     setActiveTab(id);
   };
 
@@ -125,15 +125,23 @@ export const Sidebar: React.FC = () => {
         </div>
       </div>
 
-      {/* Clean footer status */}
-      <div className="p-3 border-t border-slate-200 dark:border-slate-800 text-[11px] bg-white/40 dark:bg-slate-900/40">
-        <div className="flex justify-between items-center text-slate-500">
+      {/* Portal Switcher & Clean footer status */}
+      <div className="p-3 border-t border-slate-200 dark:border-slate-800 text-[11px] bg-white/40 dark:bg-slate-900/40 space-y-2.5">
+        <button
+          onClick={() => setIsClientPortalMode(true)}
+          className="w-full flex items-center justify-center gap-1.5 py-2 px-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold rounded-lg text-xs shadow-xs transition-all"
+        >
+          <UserCircle2 className="w-3.5 h-3.5" />
+          <span>Switch to Client Portal</span>
+        </button>
+
+        <div className="flex justify-between items-center text-slate-500 pt-1">
           <span>Resale Margin:</span>
           <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">34.5%</span>
         </div>
-        <div className="flex justify-between items-center text-slate-400 mt-1 text-[10px]">
-          <span>RunPod · Lambda · Telnyx</span>
-          <span>Online</span>
+        <div className="flex justify-between items-center text-slate-400 text-[10px]">
+          <span>Tata · Airtel · Jio · E2E</span>
+          <span className="text-emerald-500 font-semibold">Live (INR ₹)</span>
         </div>
       </div>
     </aside>

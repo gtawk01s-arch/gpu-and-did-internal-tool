@@ -9,11 +9,12 @@ import {
   Layers,
   Server,
   PhoneCall,
-  DollarSign,
+  IndianRupee,
   TrendingUp,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { MetricCard } from '../common/MetricCard';
+import { formatINR } from '../../data/mockData';
 
 export const ReportsView: React.FC = () => {
   const { gpus, sipProviders, dids, clients, invoices, providers, auditLogs } = useApp();
@@ -24,7 +25,7 @@ export const ReportsView: React.FC = () => {
     { id: 'gpu-alloc', label: 'GPU Allocation Report', icon: Server },
     { id: 'sip-alloc', label: 'SIP Allocation Report', icon: PhoneCall },
     { id: 'did-alloc', label: 'DID Allocation Report', icon: PhoneCall },
-    { id: 'revenue', label: 'Consolidated Revenue Report', icon: DollarSign },
+    { id: 'revenue', label: 'Consolidated Revenue Report', icon: IndianRupee },
     { id: 'cost', label: 'Provider Wholesale Cost Report', icon: Layers },
     { id: 'profit', label: 'Wholesale Profit Arbitrage Report', icon: TrendingUp },
     { id: 'invoice', label: 'Accounts Receivable & Invoice Report', icon: FileText },
@@ -222,9 +223,9 @@ export const ReportsView: React.FC = () => {
                       <td className="py-2 px-3 font-sans font-bold text-slate-900 dark:text-slate-100">{c.companyName}</td>
                       <td className="py-2 px-3 font-sans text-slate-500">{c.resourceRequirement}</td>
                       <td className="py-2 px-3 text-right tabular-nums">{c.allocatedGpuCount} nodes</td>
-                      <td className="py-2 px-3 text-right tabular-nums font-bold text-slate-900 dark:text-slate-100">${c.monthlySpend.toLocaleString()}</td>
-                      <td className="py-2 px-3 text-right tabular-nums text-rose-500">-${c.monthlyCost.toLocaleString()}</td>
-                      <td className="py-2 px-3 text-right tabular-nums text-emerald-600 dark:text-emerald-400 font-bold">+${profit.toLocaleString()}</td>
+                      <td className="py-2 px-3 text-right tabular-nums font-bold text-slate-900 dark:text-slate-100">{formatINR(c.monthlySpend)}</td>
+                      <td className="py-2 px-3 text-right tabular-nums text-rose-500">-{formatINR(c.monthlyCost)}</td>
+                      <td className="py-2 px-3 text-right tabular-nums text-emerald-600 dark:text-emerald-400 font-bold">+{formatINR(profit)}</td>
                       <td className="py-2 px-3 text-right tabular-nums text-cyan-600 dark:text-cyan-400 font-semibold">{c.marginPercent.toFixed(1)}%</td>
                     </tr>
                   );
@@ -253,8 +254,8 @@ export const ReportsView: React.FC = () => {
                     <td className="py-2 px-3 font-sans text-slate-600 dark:text-slate-300">{d.provider}</td>
                     <td className="py-2 px-3 font-sans">{d.country}</td>
                     <td className="py-2 px-3 font-sans text-slate-800 dark:text-slate-200">{d.assignedClient || 'Unassigned'}</td>
-                    <td className="py-2 px-3 text-right tabular-nums">${d.monthlyCost.toFixed(2)}</td>
-                    <td className="py-2 px-3 text-right tabular-nums text-emerald-600 dark:text-emerald-400 font-semibold">${d.sellingPrice.toFixed(2)}</td>
+                    <td className="py-2 px-3 text-right tabular-nums">{formatINR(d.monthlyCost)}</td>
+                    <td className="py-2 px-3 text-right tabular-nums text-emerald-600 dark:text-emerald-400 font-semibold">{formatINR(d.sellingPrice)}</td>
                     <td className="py-2 px-3 font-sans">{d.status}</td>
                   </tr>
                 ))}
@@ -280,7 +281,7 @@ export const ReportsView: React.FC = () => {
                     <td className="py-2 px-3 font-bold text-slate-900 dark:text-slate-100">{i.invoiceNumber}</td>
                     <td className="py-2 px-3 font-sans text-slate-800 dark:text-slate-200">{i.clientName}</td>
                     <td className="py-2 px-3 text-slate-500">{i.billingPeriod}</td>
-                    <td className="py-2 px-3 text-right tabular-nums font-bold text-slate-900 dark:text-slate-100">${i.totalAmount.toLocaleString()}</td>
+                    <td className="py-2 px-3 text-right tabular-nums font-bold text-slate-900 dark:text-slate-100">{formatINR(i.totalAmount)}</td>
                     <td className="py-2 px-3 text-slate-500">{i.dueDate}</td>
                     <td className="py-2 px-3 font-sans">{i.status}</td>
                   </tr>

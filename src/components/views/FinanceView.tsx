@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   TrendingUp,
-  DollarSign,
+  IndianRupee,
   PieChart,
   Layers,
   ArrowRight,
@@ -14,16 +14,17 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { MetricCard } from '../common/MetricCard';
+import { formatINR } from '../../data/mockData';
 
 export const FinanceView: React.FC = () => {
   const { clients, providers, gpus, sipProviders, dids } = useApp();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'costs' | 'revenue' | 'per-unit' | 'simulator'>('overview');
 
-  // Interactive Profit Simulator state
+  // Interactive Profit Simulator state (INR)
   const [simVolumeGpu, setSimVolumeGpu] = useState(64);
-  const [simBuyPrice, setSimBuyPrice] = useState(2150);
-  const [simSellPrice, setSimSellPrice] = useState(3200);
+  const [simBuyPrice, setSimBuyPrice] = useState(175000);
+  const [simSellPrice, setSimSellPrice] = useState(260000);
   const [simVoiceVolume, setSimVoiceVolume] = useState(1500);
 
   // Financial aggregates
@@ -94,7 +95,7 @@ export const FinanceView: React.FC = () => {
             <div>
               <div className="text-[10px] text-slate-400 font-sans">TOTAL CLIENT REVENUE</div>
               <div className="text-xl sm:text-2xl font-bold text-cyan-400 tabular-nums">
-                ${totalRevenue.toLocaleString()}
+                {formatINR(totalRevenue)}
               </div>
             </div>
 
@@ -103,7 +104,7 @@ export const FinanceView: React.FC = () => {
             <div>
               <div className="text-[10px] text-slate-400 font-sans">WHOLESALE PROVIDER COST</div>
               <div className="text-xl sm:text-2xl font-bold text-rose-400 tabular-nums">
-                ${totalCost.toLocaleString()}
+                {formatINR(totalCost)}
               </div>
             </div>
 
@@ -112,7 +113,7 @@ export const FinanceView: React.FC = () => {
             <div>
               <div className="text-[10px] text-slate-400 font-sans">GROSS RESALE PROFIT</div>
               <div className="text-xl sm:text-2xl font-bold text-emerald-400 tabular-nums">
-                ${grossProfit.toLocaleString()}
+                {formatINR(grossProfit)}
               </div>
             </div>
           </div>
@@ -166,72 +167,72 @@ export const FinanceView: React.FC = () => {
               </div>
               <div className="space-y-1.5 text-xs font-mono">
                 <div className="flex justify-between">
-                  <span className="text-slate-400 font-sans">Monthly Revenue:</span>
-                  <span className="font-semibold text-slate-900 dark:text-slate-100">${gpuRevenue.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-rose-500">
-                  <span className="text-slate-400 font-sans">Provider Wholesale:</span>
-                  <span>-${gpuCost.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold pt-1 border-t border-slate-100 dark:border-slate-800">
-                  <span className="font-sans">Monthly Gross Profit:</span>
-                  <span>+${gpuProfit.toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
+                   <span className="text-slate-400 font-sans">Monthly Revenue:</span>
+                   <span className="font-semibold text-slate-900 dark:text-slate-100">{formatINR(gpuRevenue)}</span>
+                 </div>
+                 <div className="flex justify-between text-rose-500">
+                   <span className="text-slate-400 font-sans">Provider Wholesale:</span>
+                   <span>-{formatINR(gpuCost)}</span>
+                 </div>
+                 <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold pt-1 border-t border-slate-100 dark:border-slate-800">
+                   <span className="font-sans">Monthly Gross Profit:</span>
+                   <span>+{formatINR(gpuProfit)}</span>
+                 </div>
+               </div>
+             </div>
 
-            {/* SIP Trunks Category */}
-            <div className="p-4 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
-                <div className="flex items-center gap-2 font-bold text-slate-900 dark:text-slate-100 text-xs">
-                  <PhoneCall className="w-4 h-4 text-indigo-500" />
-                  <span>SIP Voice Trunks</span>
-                </div>
-                <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                  {((sipProfit / sipRevenue) * 100).toFixed(1)}% Margin
-                </span>
-              </div>
-              <div className="space-y-1.5 text-xs font-mono">
-                <div className="flex justify-between">
-                  <span className="text-slate-400 font-sans">Monthly Revenue:</span>
-                  <span className="font-semibold text-slate-900 dark:text-slate-100">${sipRevenue.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-rose-500">
-                  <span className="text-slate-400 font-sans">Carrier Wholesale:</span>
-                  <span>-${sipCost.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold pt-1 border-t border-slate-100 dark:border-slate-800">
-                  <span className="font-sans">Monthly Gross Profit:</span>
-                  <span>+${sipProfit.toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
+             {/* SIP Trunks Category */}
+             <div className="p-4 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+               <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+                 <div className="flex items-center gap-2 font-bold text-slate-900 dark:text-slate-100 text-xs">
+                   <PhoneCall className="w-4 h-4 text-indigo-500" />
+                   <span>SIP Voice Trunks</span>
+                 </div>
+                 <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                   {((sipProfit / sipRevenue) * 100).toFixed(1)}% Margin
+                 </span>
+               </div>
+               <div className="space-y-1.5 text-xs font-mono">
+                 <div className="flex justify-between">
+                   <span className="text-slate-400 font-sans">Monthly Revenue:</span>
+                   <span className="font-semibold text-slate-900 dark:text-slate-100">{formatINR(sipRevenue)}</span>
+                 </div>
+                 <div className="flex justify-between text-rose-500">
+                   <span className="text-slate-400 font-sans">Carrier Wholesale:</span>
+                   <span>-{formatINR(sipCost)}</span>
+                 </div>
+                 <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold pt-1 border-t border-slate-100 dark:border-slate-800">
+                   <span className="font-sans">Monthly Gross Profit:</span>
+                   <span>+{formatINR(sipProfit)}</span>
+                 </div>
+               </div>
+             </div>
 
-            {/* DID Numbers Category */}
-            <div className="p-4 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
-                <div className="flex items-center gap-2 font-bold text-slate-900 dark:text-slate-100 text-xs">
-                  <PhoneCall className="w-4 h-4 text-emerald-500" />
-                  <span>DID Phone Numbers</span>
-                </div>
-                <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                  {didRevenue > 0 ? ((didProfit / didRevenue) * 100).toFixed(1) : 0}% Margin
-                </span>
-              </div>
-              <div className="space-y-1.5 text-xs font-mono">
-                <div className="flex justify-between">
-                  <span className="text-slate-400 font-sans">Monthly Revenue:</span>
-                  <span className="font-semibold text-slate-900 dark:text-slate-100">${didRevenue.toFixed(0)}</span>
-                </div>
-                <div className="flex justify-between text-rose-500">
-                  <span className="text-slate-400 font-sans">Carrier Wholesale:</span>
-                  <span>-${didCost.toFixed(0)}</span>
-                </div>
-                <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold pt-1 border-t border-slate-100 dark:border-slate-800">
-                  <span className="font-sans">Monthly Gross Profit:</span>
-                  <span>+${didProfit.toFixed(0)}</span>
-                </div>
-              </div>
+             {/* DID Numbers Category */}
+             <div className="p-4 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+               <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+                 <div className="flex items-center gap-2 font-bold text-slate-900 dark:text-slate-100 text-xs">
+                   <PhoneCall className="w-4 h-4 text-emerald-500" />
+                   <span>DID Phone Numbers</span>
+                 </div>
+                 <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                   {didRevenue > 0 ? ((didProfit / didRevenue) * 100).toFixed(1) : 0}% Margin
+                 </span>
+               </div>
+               <div className="space-y-1.5 text-xs font-mono">
+                 <div className="flex justify-between">
+                   <span className="text-slate-400 font-sans">Monthly Revenue:</span>
+                   <span className="font-semibold text-slate-900 dark:text-slate-100">{formatINR(didRevenue)}</span>
+                 </div>
+                 <div className="flex justify-between text-rose-500">
+                   <span className="text-slate-400 font-sans">Carrier Wholesale:</span>
+                   <span>-{formatINR(didCost)}</span>
+                 </div>
+                 <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold pt-1 border-t border-slate-100 dark:border-slate-800">
+                   <span className="font-sans">Monthly Gross Profit:</span>
+                   <span>+{formatINR(didProfit)}</span>
+                 </div>
+               </div>
             </div>
           </div>
         </div>
@@ -251,7 +252,7 @@ export const FinanceView: React.FC = () => {
                   <div key={p.name} className="space-y-1">
                     <div className="flex justify-between text-slate-700 dark:text-slate-200">
                       <span className="font-medium">{p.name}</span>
-                      <span className="font-mono tabular-nums font-semibold">${p.cost.toLocaleString()} ({p.share}%)</span>
+                      <span className="font-mono tabular-nums font-semibold">{formatINR(p.cost)} ({p.share}%)</span>
                     </div>
                     <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                       <div className="h-full bg-rose-500 rounded-full" style={{ width: `${p.share}%` }} />
@@ -271,7 +272,7 @@ export const FinanceView: React.FC = () => {
                   {Object.entries(gpuModelCostMap).map(([model, data]) => (
                     <div key={model} className="p-2 bg-slate-50 dark:bg-slate-800/40 rounded flex justify-between">
                       <span className="text-slate-800 dark:text-slate-200">{model}</span>
-                      <span className="tabular-nums font-semibold">${data.cost.toLocaleString()}/mo ({data.units} units)</span>
+                      <span className="tabular-nums font-semibold">{formatINR(data.cost)}/mo ({data.units} units)</span>
                     </div>
                   ))}
                 </div>
@@ -285,7 +286,7 @@ export const FinanceView: React.FC = () => {
                   {Object.entries(regionCostMap).map(([region, cost]) => (
                     <div key={region} className="p-2 bg-slate-50 dark:bg-slate-800/40 rounded flex justify-between">
                       <span className="text-slate-600 dark:text-slate-300">{region}</span>
-                      <span className="font-semibold tabular-nums">${cost.toLocaleString()}</span>
+                      <span className="font-semibold tabular-nums">{formatINR(cost)}</span>
                     </div>
                   ))}
                 </div>
@@ -325,22 +326,22 @@ export const FinanceView: React.FC = () => {
                         {c.companyName}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300">
-                        ${Math.round(c.monthlySpend * 0.88).toLocaleString()}
+                        {formatINR(c.monthlySpend * 0.88)}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300">
-                        ${Math.round(c.monthlySpend * 0.10).toLocaleString()}
+                        {formatINR(c.monthlySpend * 0.10)}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300">
-                        ${Math.round(c.monthlySpend * 0.02).toLocaleString()}
+                        {formatINR(c.monthlySpend * 0.02)}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono tabular-nums font-bold text-slate-900 dark:text-slate-100">
-                        ${c.monthlySpend.toLocaleString()}
+                        {formatINR(c.monthlySpend)}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono tabular-nums text-rose-500">
-                        -${c.monthlyCost.toLocaleString()}
+                        -{formatINR(c.monthlyCost)}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono tabular-nums text-emerald-600 dark:text-emerald-400 font-bold">
-                        +${profit.toLocaleString()}
+                        +{formatINR(profit)}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono tabular-nums text-cyan-600 dark:text-cyan-400 font-semibold">
                         {margin}%
@@ -375,8 +376,8 @@ export const FinanceView: React.FC = () => {
                       <span className="text-emerald-600 dark:text-emerald-400">+{g.marginPercent.toFixed(1)}%</span>
                     </div>
                     <div className="flex justify-between text-slate-500">
-                      <span>Buy: ${g.monthlyCost}/mo · Sell: ${g.sellingPrice}/mo</span>
-                      <span className="font-semibold text-cyan-600 dark:text-cyan-400">Spread: +${spreadPerUnit}/unit</span>
+                      <span>Buy: {formatINR(g.monthlyCost)}/mo · Sell: {formatINR(g.sellingPrice)}/mo</span>
+                      <span className="font-semibold text-cyan-600 dark:text-cyan-400">Spread: +{formatINR(spreadPerUnit)}/unit</span>
                     </div>
                   </div>
                 );
@@ -400,10 +401,10 @@ export const FinanceView: React.FC = () => {
                   >
                     <div className="flex justify-between font-bold text-slate-900 dark:text-slate-100 mb-1">
                       <span>{p.name}</span>
-                      <span className="text-emerald-600 dark:text-emerald-400 font-bold">+${spread.toLocaleString()}/mo</span>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold">+{formatINR(spread)}/mo</span>
                     </div>
                     <div className="flex justify-between text-slate-500">
-                      <span>Wholesale Commitment: ${p.monthlyCommitment.toLocaleString()}</span>
+                      <span>Wholesale Commitment: {formatINR(p.monthlyCommitment)}</span>
                       <span className="text-cyan-600 dark:text-cyan-400 font-semibold">34.2% Avg Margin</span>
                     </div>
                   </div>
@@ -446,13 +447,13 @@ export const FinanceView: React.FC = () => {
 
               <div>
                 <label className="block text-slate-600 dark:text-slate-300 font-medium mb-1">
-                  Wholesale Provider Cost: <strong className="font-mono text-rose-500">${simBuyPrice}/node/mo</strong>
+                  Wholesale Provider Cost: <strong className="font-mono text-rose-500">{formatINR(simBuyPrice)}/node/mo</strong>
                 </label>
                 <input
                   type="range"
-                  min="1000"
-                  max="4000"
-                  step="50"
+                  min="80000"
+                  max="400000"
+                  step="5000"
                   value={simBuyPrice}
                   onChange={e => setSimBuyPrice(parseInt(e.target.value))}
                   className="w-full accent-rose-500"
@@ -461,13 +462,13 @@ export const FinanceView: React.FC = () => {
 
               <div>
                 <label className="block text-slate-600 dark:text-slate-300 font-medium mb-1">
-                  Client Resale Price: <strong className="font-mono text-emerald-500">${simSellPrice}/node/mo</strong>
+                  Client Resale Price: <strong className="font-mono text-emerald-500">{formatINR(simSellPrice)}/node/mo</strong>
                 </label>
                 <input
                   type="range"
-                  min="1500"
-                  max="5500"
-                  step="50"
+                  min="120000"
+                  max="550000"
+                  step="5000"
                   value={simSellPrice}
                   onChange={e => setSimSellPrice(parseInt(e.target.value))}
                   className="w-full accent-emerald-500"
@@ -484,28 +485,28 @@ export const FinanceView: React.FC = () => {
                 <div className="flex justify-between py-1 border-b border-slate-200 dark:border-slate-700">
                   <span className="font-sans text-slate-600 dark:text-slate-300">Total Monthly Client Billing:</span>
                   <span className="text-base font-bold text-cyan-600 dark:text-cyan-400 tabular-nums">
-                    ${(simVolumeGpu * simSellPrice).toLocaleString()}
+                    {formatINR(simVolumeGpu * simSellPrice)}
                   </span>
                 </div>
 
                 <div className="flex justify-between py-1 border-b border-slate-200 dark:border-slate-700 text-rose-500">
                   <span className="font-sans text-slate-600 dark:text-slate-300">Total Upstream Provider Cost:</span>
                   <span className="text-base font-bold tabular-nums">
-                    -${(simVolumeGpu * simBuyPrice).toLocaleString()}
+                    -{formatINR(simVolumeGpu * simBuyPrice)}
                   </span>
                 </div>
 
                 <div className="flex justify-between py-1 font-bold text-base text-emerald-600 dark:text-emerald-400">
                   <span className="font-sans">Gross Reseller Spread:</span>
                   <span className="tabular-nums">
-                    +${(simVolumeGpu * (simSellPrice - simBuyPrice)).toLocaleString()}/month
+                    +{formatINR(simVolumeGpu * (simSellPrice - simBuyPrice))}/month
                   </span>
                 </div>
 
                 <div className="flex justify-between py-1 text-slate-900 dark:text-slate-100 font-semibold">
                   <span className="font-sans">Annualized Contract Gross Profit:</span>
                   <span className="tabular-nums">
-                    ${(simVolumeGpu * (simSellPrice - simBuyPrice) * 12).toLocaleString()} / year
+                    {formatINR(simVolumeGpu * (simSellPrice - simBuyPrice) * 12)} / year
                   </span>
                 </div>
               </div>

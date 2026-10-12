@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { MetricCard } from '../common/MetricCard';
+import { formatINR } from '../../data/mockData';
 
 export const BonusToolsView: React.FC = () => {
   const { gpus, sipProviders, clients, createInvoice } = useApp();
@@ -23,20 +24,20 @@ export const BonusToolsView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'forecast' | 'margin-calc' | 'comparison' | 'commission'>('forecast');
   const [autoInvoiceGenerated, setAutoInvoiceGenerated] = useState(false);
 
-  // Margin Calculator State
-  const [calcCost, setCalcCost] = useState(2150);
+  // Margin Calculator State (INR)
+  const [calcCost, setCalcCost] = useState(175000);
   const [calcMarkup, setCalcMarkup] = useState(48); // %
   const [calcUnits, setCalcUnits] = useState(32);
-  const [calcOverhead, setCalcOverhead] = useState(150); // $/node for cross-connect & cooling
+  const [calcOverhead, setCalcOverhead] = useState(12000); // ₹/node for cross-connect & cooling
 
   // Demand Forecast Horizon
   const [forecastMonths, setForecastMonths] = useState<3 | 6>(6);
 
-  // Commission Tracking State
+  // Commission Tracking State (INR)
   const salesReps = [
-    { name: 'Chloe Zhang', role: 'Enterprise Sales Lead', quotaMonthly: 180000, closedWon: 204500, commissionRate: 6.5 },
-    { name: 'Marcus Brody (Partner)', role: 'Telecom Channel Rep', quotaMonthly: 60000, closedWon: 62600, commissionRate: 5.0 },
-    { name: 'David Sterling', role: 'Growth Account Exec', quotaMonthly: 120000, closedWon: 131000, commissionRate: 6.0 },
+    { name: 'Chloe Zhang', role: 'Enterprise Sales Lead', quotaMonthly: 1500000, closedWon: 1720000, commissionRate: 6.5 },
+    { name: 'Marcus Brody (Partner)', role: 'Telecom Channel Rep', quotaMonthly: 500000, closedWon: 540000, commissionRate: 5.0 },
+    { name: 'David Sterling', role: 'Growth Account Exec', quotaMonthly: 1000000, closedWon: 1090000, commissionRate: 6.0 },
   ];
 
   // Calculated values for Margin Calculator
@@ -50,10 +51,10 @@ export const BonusToolsView: React.FC = () => {
   // Provider Comparison Matrix
   const providerComparisons = [
     {
-      provider: 'RunPod',
+      provider: 'E2E Networks',
       gpuModel: 'H100 SXM5 80GB',
-      wholesaleHourly: '$2.99 / hr',
-      wholesaleMonthly: '$2,150 / mo',
+      wholesaleHourly: '₹245 / hr',
+      wholesaleMonthly: '₹1,75,000 / mo',
       interconnect: 'NVLink 900 GB/s',
       networkBandwidth: '3.2 Tbps',
       apiProvisionLatency: '45 seconds',
@@ -61,10 +62,10 @@ export const BonusToolsView: React.FC = () => {
       reliabilityScore: '99.98%',
     },
     {
-      provider: 'CoreWeave',
+      provider: 'Yotta D1 NM1',
       gpuModel: 'H100 SXM5 80GB',
-      wholesaleHourly: '$3.05 / hr',
-      wholesaleMonthly: '$2,200 / mo',
+      wholesaleHourly: '₹252 / hr',
+      wholesaleMonthly: '₹1,80,000 / mo',
       interconnect: 'Infiniband NDR 400G',
       networkBandwidth: '3.2 Tbps',
       apiProvisionLatency: '30 seconds',
@@ -72,10 +73,10 @@ export const BonusToolsView: React.FC = () => {
       reliabilityScore: '99.99%',
     },
     {
-      provider: 'Lambda Labs',
+      provider: 'CtrlS Datacenters',
       gpuModel: 'A100 SXM4 80GB',
-      wholesaleHourly: '$1.52 / hr',
-      wholesaleMonthly: '$1,100 / mo',
+      wholesaleHourly: '₹125 / hr',
+      wholesaleMonthly: '₹90,000 / mo',
       interconnect: 'NVLink 600 GB/s',
       networkBandwidth: '1.6 Tbps',
       apiProvisionLatency: '60 seconds',
@@ -83,10 +84,10 @@ export const BonusToolsView: React.FC = () => {
       reliabilityScore: '99.94%',
     },
     {
-      provider: 'Vast.ai Datacenter',
+      provider: 'Tata Communications',
       gpuModel: 'L40S 48GB Ada',
-      wholesaleHourly: '$0.86 / hr',
-      wholesaleMonthly: '$620 / mo',
+      wholesaleHourly: '₹72 / hr',
+      wholesaleMonthly: '₹52,000 / mo',
       interconnect: 'PCIe 4.0 x16',
       networkBandwidth: '100 Gbps',
       apiProvisionLatency: '90 seconds',
@@ -333,28 +334,28 @@ export const BonusToolsView: React.FC = () => {
                 <div className="flex justify-between py-1 border-b border-slate-200 dark:border-slate-700">
                   <span className="font-sans text-slate-600 dark:text-slate-300">Quote Selling Price to Client:</span>
                   <span className="text-base font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                    ${calculatedSellPrice.toLocaleString()}/node/mo
+                    {formatINR(calculatedSellPrice)}/node/mo
                   </span>
                 </div>
 
                 <div className="flex justify-between py-1 border-b border-slate-200 dark:border-slate-700">
                   <span className="font-sans text-slate-600 dark:text-slate-300">All-in Reseller Cost:</span>
                   <span className="tabular-nums text-rose-500 font-semibold">
-                    ${totalCostPerUnit.toLocaleString()}/node/mo
+                    {formatINR(totalCostPerUnit)}/node/mo
                   </span>
                 </div>
 
                 <div className="flex justify-between py-1 border-b border-slate-200 dark:border-slate-700">
                   <span className="font-sans text-slate-600 dark:text-slate-300">Net Profit Spread per Node:</span>
                   <span className="text-base font-bold text-cyan-600 dark:text-cyan-400 tabular-nums">
-                    +${netProfitPerUnit.toLocaleString()}/month
+                    +{formatINR(netProfitPerUnit)}/month
                   </span>
                 </div>
 
                 <div className="flex justify-between py-1 font-bold text-base text-slate-900 dark:text-slate-100">
                   <span className="font-sans">Monthly Deal Gross Profit:</span>
                   <span className="text-emerald-600 dark:text-emerald-400 tabular-nums">
-                    +${monthlyTotalNetProfit.toLocaleString()} / mo
+                    +{formatINR(monthlyTotalNetProfit)} / mo
                   </span>
                 </div>
               </div>
@@ -457,11 +458,11 @@ export const BonusToolsView: React.FC = () => {
                     <div className="space-y-1.5 text-[11px] text-slate-600 dark:text-slate-300">
                       <div className="flex justify-between">
                         <span>Monthly Quota:</span>
-                        <span>${rep.quotaMonthly.toLocaleString()}</span>
+                        <span>{formatINR(rep.quotaMonthly)}</span>
                       </div>
                       <div className="flex justify-between font-bold text-slate-900 dark:text-slate-100">
                         <span>Closed Deal Volume:</span>
-                        <span>${rep.closedWon.toLocaleString()}</span>
+                        <span>{formatINR(rep.closedWon)}</span>
                       </div>
                       <div className="flex justify-between text-cyan-600 dark:text-cyan-400 font-semibold">
                         <span>Quota Attainment:</span>
@@ -473,7 +474,7 @@ export const BonusToolsView: React.FC = () => {
                   <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700/60 flex justify-between items-center">
                     <span className="font-sans text-slate-500">Commission Payout:</span>
                     <span className="text-base font-bold text-emerald-600 dark:text-emerald-400">
-                      ${payout.toLocaleString()}
+                      {formatINR(payout)}
                     </span>
                   </div>
                 </div>

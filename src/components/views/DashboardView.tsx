@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   Server,
   PhoneCall,
-  DollarSign,
+  IndianRupee,
   TrendingUp,
   Users,
   Receipt,
@@ -17,7 +17,7 @@ import {
 import { useApp } from '../../context/AppContext';
 import { MetricCard } from '../common/MetricCard';
 import { StatusBadge } from '../common/StatusBadge';
-import { FINANCIAL_TRENDS_12MO } from '../../data/mockData';
+import { FINANCIAL_TRENDS_12MO, formatINR } from '../../data/mockData';
 
 export const DashboardView: React.FC = () => {
   const {
@@ -122,29 +122,29 @@ export const DashboardView: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
           <MetricCard
             label="Monthly Resale Revenue"
-            value={`$${monthlyRevenue.toLocaleString()}`}
+            value={formatINR(monthlyRevenue)}
             subValue="Run-rate billing"
             trend={{ direction: 'up', value: '+14.2% YoY' }}
-            icon={DollarSign}
+            icon={IndianRupee}
             highlight
           />
           <MetricCard
             label="Wholesale Provider Cost"
-            value={`$${monthlyCost.toLocaleString()}`}
+            value={formatINR(monthlyCost)}
             subValue="Commitments & usage"
             trend={{ direction: 'neutral', value: '64.9% of Rev' }}
             icon={Layers}
           />
           <MetricCard
             label="Gross Wholesale Profit"
-            value={`$${grossProfit.toLocaleString()}`}
+            value={formatINR(grossProfit)}
             subValue="Spread arbitrage"
-            trend={{ direction: 'up', value: '+$28.4k vs Q2' }}
+            trend={{ direction: 'up', value: '+₹2.4L vs Q2' }}
             icon={TrendingUp}
           />
           <MetricCard
             label="Net Operating Profit"
-            value={`$${netProfit.toLocaleString()}`}
+            value={formatINR(netProfit)}
             subValue="After carrier cross-connects"
             trend={{ direction: 'up', value: '28.9% Net Margin' }}
             icon={ArrowUpRight}
@@ -190,7 +190,7 @@ export const DashboardView: React.FC = () => {
         <MetricCard
           label="Active Clients"
           value={activeClientsCount}
-          subValue={`$${outstandingInvoicesTotal.toLocaleString()} unpaid`}
+          subValue={`${formatINR(outstandingInvoicesTotal)} unpaid`}
           icon={Users}
           badge="Clients"
         />
@@ -316,15 +316,15 @@ export const DashboardView: React.FC = () => {
             <div className="flex items-center justify-center gap-6 mt-3 text-xs">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-0.5 bg-cyan-500 rounded" />
-                <span className="text-slate-600 dark:text-slate-300">Revenue ($512.3k)</span>
+                <span className="text-slate-600 dark:text-slate-300">Revenue (₹42.8L)</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-3 h-0.5 bg-rose-500 rounded border-dashed" />
-                <span className="text-slate-600 dark:text-slate-300">Provider Cost ($335.4k)</span>
+                <span className="text-slate-600 dark:text-slate-300">Provider Cost (₹28.0L)</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-3 h-0.5 bg-emerald-500 rounded" />
-                <span className="text-slate-600 dark:text-slate-300 font-semibold">Gross Profit ($176.9k)</span>
+                <span className="text-slate-600 dark:text-slate-300 font-semibold">Gross Profit (₹14.8L)</span>
               </div>
             </div>
           </div>
@@ -467,7 +467,7 @@ export const DashboardView: React.FC = () => {
                       {req.quantity}
                     </td>
                     <td className="py-2.5 px-3 text-right font-mono tabular-nums text-emerald-600 dark:text-emerald-400 font-semibold">
-                      ${req.sellingPrice.toLocaleString()}/mo
+                      {formatINR(req.sellingPrice)}/mo
                     </td>
                     <td className="py-2.5 px-3 text-slate-400 font-mono text-[11px]">
                       {req.date}

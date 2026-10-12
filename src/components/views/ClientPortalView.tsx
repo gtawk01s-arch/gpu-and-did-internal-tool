@@ -27,11 +27,13 @@ import {
   Copy,
   Share2,
   Link2,
+  X,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { MetricCard } from '../common/MetricCard';
 import { StatusBadge } from '../common/StatusBadge';
-import { Client } from '../../types';
+import { Client, Invoice } from '../../types';
+import { formatINR, SAMPLE_RECEIPT_IMAGE_SVG } from '../../data/mockData';
 
 export const ClientPortalView: React.FC = () => {
   const {
@@ -42,6 +44,7 @@ export const ClientPortalView: React.FC = () => {
     pendingRequests,
     createRequest,
     approveRequest,
+    uploadPaymentProof,
     authenticatedClient,
     clientLogin,
     clientLogout,
@@ -79,12 +82,41 @@ export const ClientPortalView: React.FC = () => {
   }, [targetedClient, authenticatedClient]);
 
   // Portal view active tab
-  const [activeTabPortal, setActiveTabPortal] = useState<'requests' | 'resources' | 'billing' | 'security'>('requests');
+  const [activeTabPortal, setActiveTabPortal] = useState<'requests' | 'resources' | 'billing' | 'users-api' | 'security'>('requests');
+
+  // Client Authorized Users & API Keys State
+  const [clientApiKeys, setClientApiKeys] = useState<{ id: string; name: string; key: string; createdAt: string; lastUsed: string; status: 'Active' | 'Revoked' }[]>([
+    { id: 'key-1', name: 'Production Dialko Agent Sync', key: 'ck_live_9f82d1c7a4b09e2381f', createdAt: '2026-08-10', lastUsed: '5 mins ago', status: 'Active' },
+    { id: 'key-2', name: 'Staging Inference Cluster', key: 'ck_test_3a8b91cd20e57201fa', createdAt: '2026-09-02', lastUsed: '2 days ago', status: 'Active' },
+  ]);
+  const [newKeyName, setNewKeyName] = useState('');
+  const [showCreateKeyModal, setShowCreateKeyModal] = useState(false);
+  const [createdKeySecret, setCreatedKeySecret] = useState<string | null>(null);
+
+  const [clientTeamUsers, setClientTeamUsers] = useState<{ id: string; name: string; email: string; role: 'Admin' | 'Engineer' | 'Billing'; status: 'Active' | 'Invited' }[]>([
+    { id: 'team-1', name: 'Sarah Jenkins', email: 'sjenkins@hyperscale.ai', role: 'Admin', status: 'Active' },
+    { id: 'team-2', name: 'DevOps Lead', email: 'devops@hyperscale.ai', role: 'Engineer', status: 'Active' },
+    { id: 'team-3', name: 'Accounts Payable', email: 'ap@hyperscale.ai', role: 'Billing', status: 'Active' },
+  ]);
+  const [showAddTeamUserModal, setShowAddTeamUserModal] = useState(false);
+  const [newTeamUserName, setNewTeamUserName] = useState('');
+  const [newTeamUserEmail, setNewTeamUserEmail] = useState('');
+  const [newTeamUserRole, setNewTeamUserRole] = useState<'Admin' | 'Engineer' | 'Billing'>('Engineer');
 
   // Modals for raising requests
   const [showGpuRequestModal, setShowGpuRequestModal] = useState(false);
   const [showSipRequestModal, setShowSipRequestModal] = useState(false);
   const [requestSubmittedMessage, setRequestSubmittedMessage] = useState<string | null>(null);
+
+  // Payment Proof Modal state
+  const [attachingProofInvoice, setAttachingProofInvoice] = useState<Invoice | null>(null);
+  const [proofScreenshotUrl, setProofScreenshotUrl] = useState<string>('');
+  const [proofFileName, setProofFileName] = useState<string>('');
+  const [proofUtrNumber, setProofUtrNumber] = useState<string>('');
+  const [proofPaymentMode, setProofPaymentMode] = useState<string>('RTGS / Corporate NetBanking');
+  const [proofNotes, setProofNotes] = useState<string>('');
+  const [proofSubmittedMessage, setProofSubmittedMessage] = useState<string | null>(null);
+  const [viewingSubmittedProofInvoice, setViewingSubmittedProofInvoice] = useState<Invoice | null>(null);
 
   // Password update state
   const [newPasswordInput, setNewPasswordInput] = useState('');
@@ -99,8 +131,51 @@ export const ClientPortalView: React.FC = () => {
   // New SIP/DID Request Form
   const [sipChannelsReq, setSipChannelsReq] = useState(500);
   const [didCountReq, setDidCountReq] = useState(50);
-  const [didCountryReq, setDidCountryReq] = useState('United States (Local 415/212)');
+  const [didCountryReq, setDidCountryReq] = useState('India (Tata / Airtel DIDs: Mumbai 022 & 1800 Toll-Free)');
   const [sipNotesReq, setSipNotesReq] = useState('');
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setProofFileName(file.name);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setProofScreenshotUrl(event.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleUsePresetReceipt = () => {
+    setProofScreenshotUrl(SAMPLE_RECEIPT_IMAGE_SVG);
+    setProofFileName('HDFC_Bank_Corporate_RTGS_Receipt_UTR982341.png');
+    setProofUtrNumber('HDFCR520261012984102');
+    setProofPaymentMode('RTGS / Corporate NetBanking');
+    setProofNotes('Transferred via Corporate NetBanking RTGS. Reference invoice memo verified.');
+  };
+
+  const handleSubmitProof = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!attachingProofInvoice || !proofScreenshotUrl) return;
+    uploadPaymentProof(attachingProofInvoice.id, {
+      screenshotUrl: proofScreenshotUrl,
+      fileName: proofFileName || 'Payment_Proof.png',
+      utrNumber: proofUtrNumber.trim() || `UTR-${Date.now()}`,
+      paymentMode: proofPaymentMode,
+      uploadedAt: new Date().toISOString().replace('T', ' ').substring(0, 16) + ' UTC',
+      notes: proofNotes,
+      clientContact: authenticatedClient?.contactPerson || authenticatedClient?.email,
+    });
+    setProofSubmittedMessage(`Payment proof successfully submitted for ${attachingProofInvoice.invoiceNumber}! Wholesale Admin will review & verify.`);
+    setAttachingProofInvoice(null);
+    setProofScreenshotUrl('');
+    setProofFileName('');
+    setProofUtrNumber('');
+    setProofNotes('');
+    setTimeout(() => setProofSubmittedMessage(null), 6000);
+  };
 
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,7 +221,7 @@ export const ClientPortalView: React.FC = () => {
             onClick={() => returnToBrokerAdmin('clients')}
             className="px-2.5 py-1 text-[11px] font-semibold text-white bg-cyan-600 hover:bg-cyan-500 rounded-lg transition-colors flex items-center gap-1 shadow-xs"
           >
-            ← Return to Broker Console
+            ← Return to Admin Portal
           </button>
         </div>
 
@@ -339,7 +414,7 @@ export const ClientPortalView: React.FC = () => {
   // LOGGED IN CLIENT VIEW
   const client = authenticatedClient;
   const clientGpus = gpus.filter(g => g.assignedClient === client.companyName);
-  const clientDids = dids.filter(d => d.assignedClient === client.companyName);
+  const clientDids = dids.filter(d => d.assignedClient === client.companyName || d.assignedClientId === client.id);
   const clientInvoices = invoices.filter(i => i.clientId === client.id || i.clientName === client.companyName);
   const clientRequests = pendingRequests.filter(r => r.clientId === client.id || r.clientName === client.companyName);
   const totalGpuUnits = clientGpus.reduce((sum, g) => sum + g.allocatedQuantity, 0);
@@ -507,7 +582,7 @@ export const ClientPortalView: React.FC = () => {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <MetricCard label="Active Dedicated GPUs" value={`${totalGpuUnits} Nodes`} subValue={clientGpus.length > 0 ? clientGpus[0].gpuModel : 'None'} highlight badge="Compute" />
         <MetricCard label="Active DID Numbers" value={`${clientDids.length} Numbers`} subValue="Inbound VoIP lines" badge="Telecom" />
-        <MetricCard label="Monthly Billing" value={`$${client.monthlySpend.toLocaleString()}`} subValue="Active contracts" badge="Billing" />
+        <MetricCard label="Monthly Billing" value={formatINR(client.monthlySpend)} subValue="Active contracts" badge="Billing" />
         <MetricCard label="Pending Requests" value={clientRequests.filter(r => r.status === 'Pending').length} subValue="Awaiting broker review" badge="Queue" />
       </div>
 
@@ -517,6 +592,7 @@ export const ClientPortalView: React.FC = () => {
           { id: 'requests', label: `My Submitted Requests (${clientRequests.length})` },
           { id: 'resources', label: `Allocated Infrastructure (${clientGpus.length + clientDids.length})` },
           { id: 'billing', label: `Invoices & Receipts (${clientInvoices.length})` },
+          { id: 'users-api', label: `Authorized Users & API Keys (${clientTeamUsers.length + clientApiKeys.length})` },
           { id: 'security', label: 'Portal Credentials & Security' },
         ].map(tab => (
           <button
@@ -587,7 +663,7 @@ export const ClientPortalView: React.FC = () => {
                         {req.quantity}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono tabular-nums font-bold text-emerald-600 dark:text-emerald-400">
-                        ${req.sellingPrice.toLocaleString()}/mo
+                        {formatINR(req.sellingPrice)}/mo
                       </td>
                       <td className="py-2.5 px-3 text-slate-400 font-mono text-[11px]">
                         {req.date}
@@ -651,7 +727,7 @@ export const ClientPortalView: React.FC = () => {
                       <div className="text-[10px] text-slate-400 font-sans">{g.region} · {g.vramGb}GB VRAM · Provider: {g.provider}</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-emerald-600 dark:text-emerald-400 font-bold font-sans">${g.sellingPrice.toLocaleString()}/mo</div>
+                      <div className="text-emerald-600 dark:text-emerald-400 font-bold font-sans">{formatINR(g.sellingPrice)}/mo</div>
                       <span className="px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 rounded text-[10px]">Active</span>
                     </div>
                   </div>
@@ -661,25 +737,59 @@ export const ClientPortalView: React.FC = () => {
           </div>
 
           <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 mb-3 flex items-center gap-1.5">
-              <PhoneCall className="w-3.5 h-3.5 text-indigo-500" />
-              <span>Assigned DID Numbers &amp; Telecom Trunks ({clientDids.length})</span>
-            </h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                <PhoneCall className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Assigned DID Numbers &amp; Telecom Trunks ({clientDids.length})</span>
+              </h3>
+              <span className="text-[11px] text-slate-400 font-sans">
+                Real-time carrier allocation &amp; SIP trunk mapping
+              </span>
+            </div>
             {clientDids.length === 0 ? (
-              <div className="p-6 text-center text-slate-400 text-xs">
-                No DID telephone numbers currently assigned. Use the "Raise SIP / DID Request" button above.
+              <div className="p-8 text-center text-slate-400 text-xs bg-slate-50 dark:bg-slate-800/20 rounded-lg border border-dashed border-slate-200 dark:border-slate-800">
+                <PhoneCall className="w-6 h-6 mx-auto mb-2 text-slate-400 opacity-60" />
+                <div>No DID telephone numbers currently assigned to your account.</div>
+                <div className="text-[11px] text-slate-500 mt-1">Use the "Raise SIP / DID Request" button above to request telephone numbers.</div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                {clientDids.map(d => (
-                  <div key={d.id} className="p-2.5 bg-slate-50 dark:bg-slate-800/40 rounded border border-slate-200 dark:border-slate-800 text-xs font-mono flex justify-between items-center">
-                    <div>
-                      <div className="font-bold text-slate-900 dark:text-slate-100">{d.didNumber}</div>
-                      <div className="text-[10px] text-slate-400 font-sans">{d.country} · {d.type}</div>
-                    </div>
-                    <span className="text-[10px] px-1.5 py-0.5 bg-cyan-100 dark:bg-cyan-950 text-cyan-800 dark:text-cyan-300 rounded">Assigned</span>
-                  </div>
-                ))}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-400 font-medium">
+                      <th className="py-2.5 px-3">DID Number (E.164)</th>
+                      <th className="py-2.5 px-3">Associated SIP Trunk</th>
+                      <th className="py-2.5 px-3">Provider</th>
+                      <th className="py-2.5 px-3">Region &amp; Type</th>
+                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3 text-right">Allocation Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-sans">
+                    {clientDids.map(d => (
+                      <tr key={d.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="py-2.5 px-3 font-mono font-bold text-slate-900 dark:text-slate-100">
+                          {d.didNumber}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono text-[11px] text-cyan-600 dark:text-cyan-400 font-semibold">
+                          {d.sipTrunkName || 'Direct Carrier Trunk'}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-700 dark:text-slate-300 font-medium">
+                          {d.provider}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-500 text-[11px]">
+                          {d.country} · <span className="font-mono text-slate-400">({d.type})</span>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <StatusBadge status={d.status} />
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono text-slate-500 text-[11px]">
+                          {d.assignedDate || 'Active'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -688,51 +798,275 @@ export const ClientPortalView: React.FC = () => {
 
       {/* Tab 3: Billing & Invoices */}
       {activeTabPortal === 'billing' && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
-          <div className="p-3 border-b border-slate-200 dark:border-slate-800 font-bold text-xs uppercase tracking-wider text-slate-700 dark:text-slate-300">
-            Corporate Invoices &amp; Billing History
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-400 font-medium">
-                  <th className="py-2.5 px-3">Invoice #</th>
-                  <th className="py-2.5 px-3">Billing Period</th>
-                  <th className="py-2.5 px-3 text-right">Amount</th>
-                  <th className="py-2.5 px-3">Due Date</th>
-                  <th className="py-2.5 px-3">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-sans">
-                {clientInvoices.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="py-8 text-center text-slate-400">
-                      No invoices issued yet.
-                    </td>
+        <div className="space-y-4">
+          {proofSubmittedMessage && (
+            <div className="p-3 bg-purple-50 dark:bg-purple-950/40 border border-purple-300 dark:border-purple-800 rounded-lg text-purple-900 dark:text-purple-200 text-xs font-semibold flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-purple-600 shrink-0" />
+              <span>{proofSubmittedMessage}</span>
+            </div>
+          )}
+
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden shadow-xs">
+            <div className="p-3 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center text-xs">
+              <span className="font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[11px]">
+                Corporate Invoices &amp; Remittance Proof Center (INR ₹)
+              </span>
+              <span className="text-slate-400 text-[11px]">Attach transaction screenshot for Admin verification</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-400 font-medium">
+                    <th className="py-2.5 px-3">Invoice #</th>
+                    <th className="py-2.5 px-3">Billing Period</th>
+                    <th className="py-2.5 px-3 text-right">Amount Due (INR ₹)</th>
+                    <th className="py-2.5 px-3">Due Date</th>
+                    <th className="py-2.5 px-3">Billing Status</th>
+                    <th className="py-2.5 px-3 text-right">Payment Proof &amp; Remittance</th>
                   </tr>
-                ) : (
-                  clientInvoices.map(inv => (
-                    <tr key={inv.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                      <td className="py-2.5 px-3 font-mono font-bold text-slate-900 dark:text-slate-100">
-                        {inv.invoiceNumber}
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300 font-mono">
-                        {inv.billingPeriod}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                        ${inv.totalAmount.toLocaleString()}
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-500 font-mono text-[11px]">
-                        {inv.dueDate}
-                      </td>
-                      <td className="py-2.5 px-3">
-                        <StatusBadge status={inv.status} />
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-sans">
+                  {clientInvoices.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-slate-400">
+                        No invoices dispatched to your panel yet.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    clientInvoices.map(inv => (
+                      <tr key={inv.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="py-2.5 px-3 font-mono font-bold text-slate-900 dark:text-slate-100">
+                          {inv.invoiceNumber}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300 font-mono text-[11px]">
+                          {inv.billingPeriod}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                          {formatINR(inv.totalAmount)}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-500 font-mono text-[11px]">
+                          {inv.dueDate}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <StatusBadge status={inv.status} />
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          {inv.status === 'Paid' ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Paid &amp; Settled</span>
+                            </span>
+                          ) : inv.status === 'Verification Pending' ? (
+                            <button
+                              onClick={() => setViewingSubmittedProofInvoice(inv)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-purple-700 bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 dark:hover:bg-purple-900/60 border border-purple-200 dark:border-purple-800 rounded-md transition-colors"
+                              title="Click to view attached proof"
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
+                              <span>⚡ Proof Under Review</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setAttachingProofInvoice(inv);
+                                setProofScreenshotUrl('');
+                                setProofFileName('');
+                                setProofUtrNumber('');
+                                setProofNotes('');
+                              }}
+                              className="px-3 py-1.5 text-[11px] font-bold text-white bg-cyan-600 hover:bg-cyan-500 rounded-md transition-colors shadow-xs flex items-center gap-1.5 ml-auto"
+                            >
+                              <Eye className="w-3 h-3" />
+                              <span>Attach Payment Screenshot</span>
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Indian Bank Coordinates Card for Client Remittance */}
+          <div className="p-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl space-y-2 text-xs">
+            <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-cyan-500" />
+              <span>Official Bank Transfer Coordinates (RTGS / NEFT / IMPS)</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-[11px] text-slate-600 dark:text-slate-300 pt-1">
+              <div className="p-2.5 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                <span className="text-slate-400 block font-sans text-[10px]">Beneficiary Name:</span>
+                <span className="font-bold text-slate-900 dark:text-slate-100">AetherVox Wholesale Infra Ltd</span>
+              </div>
+              <div className="p-2.5 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                <span className="text-slate-400 block font-sans text-[10px]">Bank &amp; Account Number:</span>
+                <span className="font-bold text-slate-900 dark:text-slate-100">ICICI Bank · 001105029381</span>
+              </div>
+              <div className="p-2.5 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                <span className="text-slate-400 block font-sans text-[10px]">IFSC Code &amp; Branch:</span>
+                <span className="font-bold text-slate-900 dark:text-slate-100">ICIC0000011 (Nariman Point, Mumbai)</span>
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-400 font-sans">
+              After completing the bank transfer, click <strong>"Attach Payment Screenshot"</strong> above to upload your payment receipt and UTR number. The Wholesale Admin will verify and mark your invoice as Paid.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Tab: Authorized Team Users & API Keys */}
+      {activeTabPortal === 'users-api' && (
+        <div className="space-y-6">
+          {/* Section A: Authorized Organization Users */}
+          <div className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div>
+                <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-1.5">
+                  <UserCircle2 className="w-4 h-4 text-cyan-500" />
+                  <span>Authorized Organization Users ({client.companyName})</span>
+                </h3>
+                <p className="text-slate-500 text-xs">
+                  Colleagues and engineers authorized to request GPU and DID infrastructure on behalf of {client.companyName}.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAddTeamUserModal(true)}
+                className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 self-start sm:self-auto shadow-xs transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Invite Team Member</span>
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-400 font-medium">
+                    <th className="py-2.5 px-3">Full Name</th>
+                    <th className="py-2.5 px-3">Email Address</th>
+                    <th className="py-2.5 px-3">Role / Permissions</th>
+                    <th className="py-2.5 px-3">Access Status</th>
+                    <th className="py-2.5 px-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-sans">
+                  {clientTeamUsers.map(u => (
+                    <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-slate-100">
+                        {u.name}
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                        {u.email}
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                          {u.role}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                          {u.status}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        <button
+                          onClick={() => setClientTeamUsers(prev => prev.filter(item => item.id !== u.id))}
+                          className="text-rose-500 hover:text-rose-600 text-[11px] font-medium"
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Section B: API Keys for Dialko & Compute Integrations */}
+          <div className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div>
+                <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-1.5">
+                  <KeyRound className="w-4 h-4 text-indigo-500" />
+                  <span>API Keys &amp; Dialko Agent Integration Tokens</span>
+                </h3>
+                <p className="text-slate-500 text-xs">
+                  Authenticate programmatic requests to allocate GPUs, manage SIP call trunks, or route through Dialko voice agents.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setNewKeyName('');
+                  setCreatedKeySecret(null);
+                  setShowCreateKeyModal(true);
+                }}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 self-start sm:self-auto shadow-xs transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Generate API Key</span>
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-400 font-medium">
+                    <th className="py-2.5 px-3">Token Name</th>
+                    <th className="py-2.5 px-3">Key Preview</th>
+                    <th className="py-2.5 px-3">Created Date</th>
+                    <th className="py-2.5 px-3">Last Activity</th>
+                    <th className="py-2.5 px-3">Status</th>
+                    <th className="py-2.5 px-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-sans">
+                  {clientApiKeys.map(k => (
+                    <tr key={k.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-slate-100">
+                        {k.name}
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-[11px] text-cyan-600 dark:text-cyan-400">
+                        {k.key.substring(0, 12)}••••••••
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-slate-500 text-[11px]">
+                        {k.createdAt}
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-500 text-[11px]">
+                        {k.lastUsed}
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                          k.status === 'Active'
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                            : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                        }`}>
+                          {k.status}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        {k.status === 'Active' ? (
+                          <button
+                            onClick={() => {
+                              setClientApiKeys(prev =>
+                                prev.map(item => item.id === k.id ? { ...item, status: 'Revoked' } : item)
+                              );
+                            }}
+                            className="text-rose-500 hover:text-rose-600 text-[11px] font-medium"
+                          >
+                            Revoke
+                          </button>
+                        ) : (
+                          <span className="text-slate-400 italic text-[11px]">Revoked</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
@@ -995,17 +1329,18 @@ export const ClientPortalView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-slate-600 dark:text-slate-300 mb-1 font-medium">Country / Area Region</label>
+                <label className="block text-slate-600 dark:text-slate-300 mb-1 font-medium">Telecom Circle / Area Region</label>
                 <select
                   value={didCountryReq}
                   onChange={e => setDidCountryReq(e.target.value)}
                   className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100"
                 >
-                  <option value="United States (Local 415/212)">United States (Local 415/212/312)</option>
-                  <option value="United States (Toll-Free 800/888)">United States (Toll-Free 800/888)</option>
-                  <option value="United Kingdom (+44 20 London)">United Kingdom (+44 20 London)</option>
-                  <option value="Germany (+49 30 Berlin)">Germany (+49 30 Berlin)</option>
-                  <option value="Singapore (+65 Local)">Singapore (+65 Local)</option>
+                  <option value="India (Mumbai 022 - Tata Teleservices)">India (Mumbai 022 - Tata Teleservices)</option>
+                  <option value="India (Delhi NCR 011 - Airtel Business)">India (Delhi NCR 011 - Airtel Business)</option>
+                  <option value="India (Bengaluru 080 - Reliance Jio Enterprise)">India (Bengaluru 080 - Reliance Jio Enterprise)</option>
+                  <option value="India (National Toll-Free 1800 - Tata / Airtel)">India (National Toll-Free 1800 - Tata / Airtel)</option>
+                  <option value="India (Hyderabad 040 / Pune 020)">India (Hyderabad 040 / Pune 020)</option>
+                  <option value="India (Chennai 044 - Vi Business)">India (Chennai 044 - Vi Business)</option>
                 </select>
               </div>
 
@@ -1033,6 +1368,385 @@ export const ClientPortalView: React.FC = () => {
                   className="px-4 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg"
                 >
                   Submit Voice Request
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Client Uploads Payment Proof Screenshot (Requirement 3) */}
+      {attachingProofInvoice && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl p-5 my-6">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-cyan-500" />
+                  <span>Attach Bank Remittance Screenshot</span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Invoice <strong className="font-mono text-slate-700 dark:text-slate-300">{attachingProofInvoice.invoiceNumber}</strong> · Amount Due: <strong className="text-emerald-600 font-mono">{formatINR(attachingProofInvoice.totalAmount)}</strong>
+                </p>
+              </div>
+              <button
+                onClick={() => setAttachingProofInvoice(null)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitProof} className="space-y-4 text-xs">
+              {/* Preset 1-Click receipt helper */}
+              <div className="p-3 bg-cyan-50/70 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800 rounded-xl flex items-center justify-between gap-3">
+                <div>
+                  <span className="font-bold text-cyan-900 dark:text-cyan-200 text-xs block">Need quick test proof?</span>
+                  <span className="text-[11px] text-cyan-700 dark:text-cyan-400">Autofill a verified HDFC Bank Corporate RTGS Receipt.</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleUsePresetReceipt}
+                  className="px-2.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg text-xs transition-colors shadow-xs shrink-0"
+                >
+                  ⚡ Use Sample Receipt
+                </button>
+              </div>
+
+              {/* File Upload Selector */}
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 mb-1 font-semibold">
+                  Upload Payment Screenshot / Counterfoil (Image / PNG / JPEG)
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-cyan-50 dark:file:bg-cyan-950/50 file:text-cyan-700 dark:file:text-cyan-300 hover:file:bg-cyan-100"
+                />
+                {proofFileName && (
+                  <span className="text-[11px] text-slate-400 font-mono mt-1 block">
+                    Selected file: {proofFileName}
+                  </span>
+                )}
+              </div>
+
+              {/* Image Preview */}
+              {proofScreenshotUrl && (
+                <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-slate-950 p-2 flex items-center justify-center max-h-48">
+                  <img
+                    src={proofScreenshotUrl}
+                    alt="Proof preview"
+                    className="max-h-44 object-contain rounded"
+                  />
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 mb-1 font-semibold">
+                    Bank UTR / Ref Number <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. HDFCR520261012984102"
+                    value={proofUtrNumber}
+                    onChange={e => setProofUtrNumber(e.target.value)}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 mb-1 font-semibold">Payment Mode</label>
+                  <select
+                    value={proofPaymentMode}
+                    onChange={e => setProofPaymentMode(e.target.value)}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 font-medium"
+                  >
+                    <option value="RTGS / Corporate NetBanking">RTGS (Real-Time Gross Settlement)</option>
+                    <option value="NEFT">NEFT (National Electronic Fund Transfer)</option>
+                    <option value="IMPS / Immediate Transfer">IMPS (Immediate Payment)</option>
+                    <option value="Corporate UPI / QR">Corporate UPI / QR</option>
+                    <option value="Corporate NetBanking Direct">Corporate NetBanking Direct</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 mb-1 font-semibold">Remarks / Transfer Memo</label>
+                <textarea
+                  rows={2}
+                  value={proofNotes}
+                  onChange={e => setProofNotes(e.target.value)}
+                  placeholder="e.g. Settled from HDFC Current Account. Reference INV memo included."
+                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setAttachingProofInvoice(null)}
+                  className="px-3 py-1.5 text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!proofScreenshotUrl}
+                  className="px-4 py-2 text-xs font-bold text-white bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-xs transition-colors flex items-center gap-1.5"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Submit Proof to Admin</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Client Reviews Their Already Submitted Proof */}
+      {viewingSubmittedProofInvoice && viewingSubmittedProofInvoice.paymentProof && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl p-5 my-6">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800 mb-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-purple-600" />
+                  <span>Submitted Remittance Counterfoil</span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Invoice <strong className="font-mono text-slate-700 dark:text-slate-300">{viewingSubmittedProofInvoice.invoiceNumber}</strong> · Under review by Wholesale Admin
+                </p>
+              </div>
+              <button
+                onClick={() => setViewingSubmittedProofInvoice(null)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3 bg-purple-50/70 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 rounded-xl font-mono text-[11px] space-y-1">
+                <div>UTR Number: <strong className="text-purple-900 dark:text-purple-200">{viewingSubmittedProofInvoice.paymentProof.utrNumber}</strong></div>
+                <div>Payment Mode: <strong>{viewingSubmittedProofInvoice.paymentProof.paymentMode}</strong></div>
+                <div>Submitted At: <strong>{viewingSubmittedProofInvoice.paymentProof.uploadedAt}</strong></div>
+                {viewingSubmittedProofInvoice.paymentProof.notes && (
+                  <div>Remarks: <span className="italic">{viewingSubmittedProofInvoice.paymentProof.notes}</span></div>
+                )}
+              </div>
+
+              <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-slate-950 p-2 flex items-center justify-center max-h-72">
+                <img
+                  src={viewingSubmittedProofInvoice.paymentProof.screenshotUrl}
+                  alt="Submitted counterfoil"
+                  className="max-h-68 object-contain rounded"
+                />
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setViewingSubmittedProofInvoice(null)}
+                  className="px-4 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Generate API Key */}
+      {showCreateKeyModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-indigo-500" />
+                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                  Generate API Integration Key
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  setShowCreateKeyModal(false);
+                  setCreatedKeySecret(null);
+                }}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs"
+              >
+                ✕
+              </button>
+            </div>
+
+            {createdKeySecret ? (
+              <div className="space-y-3 text-xs">
+                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 rounded-lg text-emerald-800 dark:text-emerald-200">
+                  <div className="font-bold mb-1">API Key Successfully Generated!</div>
+                  <div className="text-[11px]">Copy this key now. It will not be shown in full again for security reasons.</div>
+                </div>
+                <div className="p-2.5 bg-slate-950 text-emerald-400 font-mono text-xs rounded border border-slate-800 select-all break-all">
+                  {createdKeySecret}
+                </div>
+                <div className="flex justify-end pt-2">
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(createdKeySecret);
+                      setCopiedUrl(true);
+                      setTimeout(() => setCopiedUrl(false), 2000);
+                    }}
+                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded font-semibold text-xs flex items-center gap-1"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Copy API Key</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form
+                onSubmit={e => {
+                  e.preventDefault();
+                  if (!newKeyName.trim()) return;
+                  const keySecret = `ck_live_${Math.random().toString(36).substring(2)}${Date.now().toString(36)}`;
+                  const newEntry = {
+                    id: `key-${Date.now()}`,
+                    name: newKeyName.trim(),
+                    key: keySecret,
+                    createdAt: new Date().toISOString().split('T')[0],
+                    lastUsed: 'Never',
+                    status: 'Active' as const,
+                  };
+                  setClientApiKeys(prev => [newEntry, ...prev]);
+                  setCreatedKeySecret(keySecret);
+                }}
+                className="space-y-3 text-xs"
+              >
+                <div>
+                  <label className="block text-slate-600 dark:text-slate-300 mb-1 font-medium">Token Name / Application</label>
+                  <input
+                    type="text"
+                    required
+                    value={newKeyName}
+                    onChange={e => setNewKeyName(e.target.value)}
+                    placeholder="e.g. Production Dialko Voice Gateway, AI Inference Worker"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100"
+                  />
+                </div>
+                <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded border border-slate-200 dark:border-slate-700/60 text-[11px] text-slate-500">
+                  This key will have authorized tenant permissions strictly scoped to <strong>{client.companyName}</strong>. Cross-organization access is prohibited by backend tenant isolation.
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateKeyModal(false)}
+                    className="px-3 py-1.5 text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded"
+                  >
+                    Create Key
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Invite Team User */}
+      {showAddTeamUserModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <UserCircle2 className="w-4 h-4 text-cyan-500" />
+                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                  Invite Team Member to {client.companyName}
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowAddTeamUserModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={e => {
+                e.preventDefault();
+                if (!newTeamUserName || !newTeamUserEmail) return;
+                setClientTeamUsers(prev => [
+                  ...prev,
+                  {
+                    id: `team-${Date.now()}`,
+                    name: newTeamUserName.trim(),
+                    email: newTeamUserEmail.trim(),
+                    role: newTeamUserRole,
+                    status: 'Active',
+                  },
+                ]);
+                setShowAddTeamUserModal(false);
+                setNewTeamUserName('');
+                setNewTeamUserEmail('');
+              }}
+              className="space-y-3 text-xs"
+            >
+              <div>
+                <label className="block text-slate-600 dark:text-slate-300 mb-1 font-medium">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  value={newTeamUserName}
+                  onChange={e => setNewTeamUserName(e.target.value)}
+                  placeholder="e.g. Alex Rivera"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-600 dark:text-slate-300 mb-1 font-medium">Work Email Address</label>
+                <input
+                  type="email"
+                  required
+                  value={newTeamUserEmail}
+                  onChange={e => setNewTeamUserEmail(e.target.value)}
+                  placeholder="e.g. alex@company.com"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-600 dark:text-slate-300 mb-1 font-medium">Role &amp; Permissions</label>
+                <select
+                  value={newTeamUserRole}
+                  onChange={e => setNewTeamUserRole(e.target.value as any)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100"
+                >
+                  <option value="Engineer">Engineer (Submit GPU &amp; SIP Requests, Read Infrastructure)</option>
+                  <option value="Billing">Billing (View Invoices, Attach Payment Counterfoils)</option>
+                  <option value="Admin">Admin (Full Organization Access, Generate API Keys)</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAddTeamUserModal(false)}
+                  className="px-3 py-1.5 text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 text-xs font-semibold text-white bg-cyan-600 hover:bg-cyan-500 rounded"
+                >
+                  Send Invite
                 </button>
               </div>
             </form>

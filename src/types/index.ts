@@ -63,7 +63,10 @@ export interface DidNumber {
   country: string;
   areaCode: string;
   provider: string;
+  sipTrunkId?: string;
+  sipTrunkName?: string;
   assignedClient?: string;
+  assignedClientId?: string;
   assignedDate?: string;
   monthlyCost: number;
   sellingPrice: number;
@@ -105,7 +108,7 @@ export interface PendingRequest {
   requestId: string;
   clientId: string;
   clientName: string;
-  resourceType: 'GPU Cluster' | 'SIP Trunk' | 'DID Number Block';
+  resourceType: 'GPU Cluster' | 'DID / SIP Trunk' | 'SIP Trunk' | 'DID Number Block';
   specs: string;
   quantity: number;
   date: string;
@@ -116,6 +119,8 @@ export interface PendingRequest {
   notes?: string;
 }
 
+export type ResourceType = 'GPU Cluster' | 'DID / SIP Trunk';
+
 export interface Provider {
   id: string;
   name: string;
@@ -123,15 +128,40 @@ export interface Provider {
   serviceType: string;
   contractStart: string;
   contractEnd: string;
-  monthlyCommitment: number;
+  monthlyCommitment: number; // in INR ₹
   apiStatus: 'Operational' | 'Degraded' | 'Offline';
   uptime90d: number;
   apiLatencyMs: number;
   allocatedResourcesCount: number;
   contactEmail: string;
+  // Specific capacity and contract metrics
+  purchasedGpuCount?: number;
+  purchasedGpuModel?: string;
+  purchasedDidCount?: number;
+  trunkChannels?: number;
+  lastHeartbeat?: string;
 }
 
-export type InvoiceStatus = 'Draft' | 'Invoice Sent' | 'Paid' | 'Partially Paid' | 'Overdue' | 'Cancelled';
+export type InvoiceStatus =
+  | 'Draft'
+  | 'Sent to Client'
+  | 'Invoice Sent'
+  | 'Verification Pending'
+  | 'Paid'
+  | 'Unpaid'
+  | 'Partially Paid'
+  | 'Overdue'
+  | 'Cancelled';
+
+export interface PaymentProof {
+  screenshotUrl: string;
+  fileName?: string;
+  utrNumber?: string; // UTR or Bank Reference No
+  paymentMode?: string; // UPI, NEFT, RTGS, IMPS, NetBanking
+  uploadedAt: string;
+  notes?: string;
+  clientContact?: string;
+}
 
 export interface InvoiceItem {
   description: string;
@@ -149,20 +179,27 @@ export interface Invoice {
   clientEmail: string;
   billingPeriod: string;
   gpuCount: number;
+  gpuUnitPrice?: number;
   gpuCharges: number;
   sipCount: number;
-  sipCharges: number;
   didCount: number;
+  didUnitPrice?: number;
+  sipCharges: number;
   didCharges: number;
   subtotal: number;
-  taxes: number;
-  totalAmount: number;
+  taxes: number; // GST 18% in INR
+  totalAmount: number; // in INR ₹
   dueDate: string;
   issueDate: string;
   status: InvoiceStatus;
   items: InvoiceItem[];
   paymentInstructions: string;
   paidAmount?: number;
+  sentToClientPortal?: boolean;
+  sentToClientAt?: string;
+  paymentProof?: PaymentProof;
+  verifiedBy?: string;
+  verifiedAt?: string;
 }
 
 export interface Payment {
@@ -172,9 +209,10 @@ export interface Payment {
   clientName: string;
   amount: number;
   date: string;
-  method: 'ACH Wire Transfer' | 'Stripe Credit' | 'SWIFT Fedwire' | 'Corporate Card';
+  method: 'IMPS / UPI' | 'NEFT / RTGS' | 'Corporate NetBanking' | 'ACH Wire Transfer' | 'Stripe Credit';
   referenceNumber: string;
   status: 'Settled' | 'Processing' | 'Failed';
+  verifiedBy?: string;
 }
 
 export type AlertSeverity = 'Critical' | 'High' | 'Medium' | 'Low';
@@ -184,12 +222,13 @@ export interface SystemAlert {
   title: string;
   description: string;
   category:
-    | 'Provider API Down'
-    | 'Failed Provisioning'
-    | 'GPU Inventory Low'
+    | 'SIP Down'
     | 'SIP Trunk Down'
-    | 'DID Exhaustion'
     | 'Poor Call Quality'
+    | 'Failed Provisioning'
+    | 'Provider API Down'
+    | 'GPU Inventory Low'
+    | 'DID Exhaustion'
     | 'Failed Payment'
     | 'Contract Expiring';
   severity: AlertSeverity;
@@ -197,6 +236,14 @@ export interface SystemAlert {
   acknowledged: boolean;
   resolved: boolean;
   targetResource?: string;
+  trunkTelemetry?: {
+    carrier: string;
+    mosScore?: number;
+    jitterMs?: number;
+    packetLossPct?: number;
+    sipCode?: number;
+    trunkId?: string;
+  };
 }
 
 export interface AuditLog {

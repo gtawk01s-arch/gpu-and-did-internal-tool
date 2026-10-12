@@ -10,6 +10,7 @@ import {
   Provider,
   Invoice,
   Payment,
+  PaymentProof,
   SystemAlert,
   AuditLog,
   SupportTicket,
@@ -64,14 +65,25 @@ interface AppContextType {
   releaseDid: (id: string) => void;
   suspendDid: (id: string) => void;
   portDid: (id: string) => void;
+  addSipProvider: (provider: Partial<SipProvider>) => void;
+  addDidNumber: (did: Partial<DidNumber>) => { success: boolean; error?: string };
+  importDidNumbers: (trunkId: string, numbersList: string[], monthlyCost?: number, sellingPrice?: number) => { added: number; skipped: number };
   approveRequest: (id: string) => void;
   rejectRequest: (id: string) => void;
   holdRequest: (id: string) => void;
   createRequest: (req: Partial<PendingRequest>) => void;
   createInvoice: (invoice: Partial<Invoice>) => void;
   markInvoicePaid: (id: string) => void;
+  markInvoiceUnpaid: (id: string) => void;
   sendInvoice: (id: string) => void;
+  sendInvoiceToClient: (id: string) => void;
   sendReminder: (id: string) => void;
+  uploadPaymentProof: (invoiceId: string, proof: PaymentProof) => void;
+  verifyPaymentProof: (invoiceId: string) => void;
+  rejectPaymentProof: (invoiceId: string, reason?: string) => void;
+  changeUserPassword: (userId: string, newPass: string) => { success: boolean; message: string };
+  pingProviderApi: (providerId: string) => void;
+  simulateTrunkAlert: (type: 'sip_down' | 'poor_quality' | 'failed_provision') => void;
   createPayment: (payment: Partial<Payment>) => void;
   acknowledgeAlert: (id: string) => void;
   resolveAlert: (id: string) => void;
@@ -456,6 +468,112 @@ Please save and bookmark your dedicated URL for instant access.
     );
   };
 
+  const addSipProvider = (provider: Partial<SipProvider>) => {
+    const newProv: SipProvider = {
+      id: `sip-prov-${Date.now()}`,
+      providerName: provider.providerName || 'New SIP Provider',
+      sipTrunkName: provider.sipTrunkName || `TRUNK-${Date.now().toString().slice(-4)}`,
+      didRange: provider.didRange || '+91 XX XXXX XXXX',
+      country: provider.country || 'India',
+      monthlyCost: provider.monthlyCost || 250000,
+      maxChannels: provider.maxChannels || 1000,
+      activeChannels: 0,
+      status: 'Active',
+      apiStatus: 'Operational',
+      contractEnd: provider.contractEnd || '2027-12-31',
+    };
+    setSipProviders(prev => [...prev, newProv]);
+    addAuditLog('Provider Changes', 'None', `Created SIP Trunk ${newProv.sipTrunkName} (${newProv.providerName})`, newProv.id);
+  };
+
+  const addDidNumber = (did: Partial<DidNumber>): { success: boolean; error?: string } => {
+    if (!did.didNumber) {
+      return { success: false, error: 'DID number is required' };
+    }
+    const cleanNum = did.didNumber.trim();
+    const existing = dids.find(d => d.didNumber.trim() === cleanNum);
+    if (existing) {
+      return { success: false, error: `DID number ${cleanNum} already exists in inventory (duplicate prevented)` };
+    }
+
+    const trunk = sipProviders.find(p => p.id === did.sipTrunkId);
+
+    const newDid: DidNumber = {
+      id: `did-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      didNumber: cleanNum,
+      country: did.country || 'India',
+      areaCode: did.areaCode || 'Local/National',
+      provider: trunk ? trunk.providerName : did.provider || 'Tata Teleservices (TTL Enterprise)',
+      sipTrunkId: trunk?.id || did.sipTrunkId,
+      sipTrunkName: trunk?.sipTrunkName || did.sipTrunkName,
+      monthlyCost: did.monthlyCost || 250,
+      sellingPrice: did.sellingPrice || 650,
+      status: did.status || 'Available',
+      type: did.type || 'Local',
+      usageMinutes: 0,
+      assignedClient: did.assignedClient,
+      assignedDate: did.assignedClient ? new Date().toISOString().split('T')[0] : undefined,
+    };
+
+    setDids(prev => [...prev, newDid]);
+    addAuditLog('DID Allocation', 'None', `Added DID Number ${newDid.didNumber} to ${newDid.sipTrunkName || 'Inventory'}`, newDid.id);
+    return { success: true };
+  };
+
+  const importDidNumbers = (
+    trunkId: string,
+    numbersList: string[],
+    monthlyCost: number = 250,
+    sellingPrice: number = 650
+  ): { added: number; skipped: number } => {
+    const trunk = sipProviders.find(p => p.id === trunkId);
+    let addedCount = 0;
+    let skippedCount = 0;
+    const newItems: DidNumber[] = [];
+
+    // Existing numbers set for fast lookup and duplicate prevention
+    const existingNumbers = new Set(dids.map(d => d.didNumber.trim()));
+
+    numbersList.forEach(rawNum => {
+      const clean = rawNum.trim();
+      if (!clean) return;
+      if (existingNumbers.has(clean)) {
+        skippedCount++;
+        return;
+      }
+      existingNumbers.add(clean);
+      addedCount++;
+
+      const is1800 = clean.startsWith('1800') || clean.includes('1800');
+      newItems.push({
+        id: `did-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+        didNumber: clean,
+        country: 'India',
+        areaCode: is1800 ? '1800 (National Toll-Free)' : 'Pan-India E.164',
+        provider: trunk ? trunk.providerName : 'Telecom Interconnect',
+        sipTrunkId: trunk?.id,
+        sipTrunkName: trunk?.sipTrunkName,
+        monthlyCost: monthlyCost,
+        sellingPrice: sellingPrice,
+        status: 'Available',
+        type: is1800 ? 'Toll-Free' : 'Local',
+        usageMinutes: 0,
+      });
+    });
+
+    if (newItems.length > 0) {
+      setDids(prev => [...prev, ...newItems]);
+      addAuditLog(
+        'DID Allocation',
+        'None',
+        `Batch Imported ${addedCount} DIDs into trunk ${trunk?.sipTrunkName || trunkId}`,
+        trunkId
+      );
+    }
+
+    return { added: addedCount, skipped: skippedCount };
+  };
+
   const approveRequest = (id: string) => {
     const targetReq = pendingRequests.find(r => r.id === id);
     if (!targetReq) return;
@@ -505,22 +623,31 @@ Please save and bookmark your dedicated URL for instant access.
         })
       );
     } else {
-      // SIP Trunk or DID
+      // SIP Trunk or DID Number Block
+      const requestedQty = Math.max(1, targetReq.quantity || 1);
+      const allocatedDidIds: string[] = [];
+
       setDids(prev => {
         let count = 0;
         return prev.map(did => {
-          if (count < 5 && did.status === 'Available') {
+          // Strictly prevent allocating the same DID number to multiple clients (only allocate Available status)
+          if (count < requestedQty && did.status === 'Available') {
             count++;
+            allocatedDidIds.push(did.id);
             return {
               ...did,
               assignedClient: targetReq.clientName,
+              assignedClientId: targetReq.clientId,
               assignedDate: new Date().toISOString().split('T')[0],
-              status: 'Assigned',
+              status: 'Assigned' as const,
             };
           }
           return did;
         });
       });
+
+      const actualAllocatedCount = Math.min(requestedQty, dids.filter(d => d.status === 'Available').length);
+
       setClients(prev =>
         prev.map(c => {
           if (c.companyName === targetReq.clientName || c.id === targetReq.clientId) {
@@ -528,7 +655,7 @@ Please save and bookmark your dedicated URL for instant access.
             const cost = c.monthlyCost + targetReq.monthlyCost;
             return {
               ...c,
-              allocatedDidCount: c.allocatedDidCount + 5,
+              allocatedDidCount: c.allocatedDidCount + (actualAllocatedCount || requestedQty),
               allocatedSipCount: c.allocatedSipCount + 1,
               monthlySpend: spend,
               monthlyCost: cost,
@@ -588,46 +715,70 @@ Please save and bookmark your dedicated URL for instant access.
   const createInvoice = (inv: Partial<Invoice>) => {
     const count = invoices.length + 897;
     const invNum = `INV-2026-0${count}`;
+    const gpuCount = inv.gpuCount || 0;
+    const gpuUnitPrice = inv.gpuUnitPrice || (gpuCount > 0 && inv.gpuCharges ? Math.round(inv.gpuCharges / gpuCount) : 180000);
+    const gpuCharges = inv.gpuCharges !== undefined ? inv.gpuCharges : gpuCount * gpuUnitPrice;
+
+    const didCount = inv.didCount || 0;
+    const didUnitPrice = inv.didUnitPrice || (didCount > 0 && inv.didCharges ? Math.round(inv.didCharges / didCount) : 650);
+    const didCharges = inv.didCharges !== undefined ? inv.didCharges : didCount * didUnitPrice;
+
+    const sipCharges = inv.sipCharges || 0;
+    const subtotal = gpuCharges + didCharges + sipCharges;
+    const taxes = Math.round(subtotal * 0.18); // 18% GST in INR
+    const totalAmount = subtotal + taxes;
+
+    const isDirectSend = inv.sentToClientPortal ?? false;
     const newInvoice: Invoice = {
       id: `inv-0${count}`,
       invoiceNumber: invNum,
       clientId: inv.clientId || 'clt-001',
-      clientName: inv.clientName || 'HyperScale AI Inc.',
+      clientName: inv.clientName || 'HyperScale AI India Pvt Ltd',
       clientEmail: inv.clientEmail || 'billing@hyperscale.ai',
       billingPeriod: inv.billingPeriod || 'November 01, 2026 – November 30, 2026',
-      gpuCount: inv.gpuCount || 0,
-      gpuCharges: inv.gpuCharges || 0,
+      gpuCount,
+      gpuUnitPrice,
+      gpuCharges,
       sipCount: inv.sipCount || 0,
-      sipCharges: inv.sipCharges || 0,
-      didCount: inv.didCount || 0,
-      didCharges: inv.didCharges || 0,
-      subtotal: (inv.gpuCharges || 0) + (inv.sipCharges || 0) + (inv.didCharges || 0),
-      taxes: Math.round(((inv.gpuCharges || 0) + (inv.sipCharges || 0) + (inv.didCharges || 0)) * 0.04),
-      totalAmount:
-        Math.round(((inv.gpuCharges || 0) + (inv.sipCharges || 0) + (inv.didCharges || 0)) * 1.04),
+      didCount,
+      didUnitPrice,
+      sipCharges,
+      didCharges,
+      subtotal,
+      taxes,
+      totalAmount,
       dueDate: inv.dueDate || '2026-11-20',
       issueDate: new Date().toISOString().split('T')[0],
-      status: 'Draft',
-      items: inv.items || [
-        {
-          description: 'Standard Wholesale Resource Package',
-          category: 'GPU',
-          quantity: 1,
-          unitPrice: inv.gpuCharges || 10000,
-          total: inv.gpuCharges || 10000,
-        },
+      status: isDirectSend ? 'Sent to Client' : (inv.status || 'Draft'),
+      sentToClientPortal: isDirectSend,
+      sentToClientAt: isDirectSend ? new Date().toISOString().replace('T', ' ').substring(0, 16) + ' UTC' : undefined,
+      items: inv.items && inv.items.length > 0 ? inv.items : [
+        ...(gpuCount > 0 ? [{
+          description: `${gpuCount}x GPU Compute Cluster Nodes (@ ₹${gpuUnitPrice.toLocaleString('en-IN')}/unit)`,
+          category: 'GPU' as const,
+          quantity: gpuCount,
+          unitPrice: gpuUnitPrice,
+          total: gpuCharges,
+        }] : []),
+        ...(didCount > 0 ? [{
+          description: `${didCount}x Indian DID Telecom Numbers (@ ₹${didUnitPrice.toLocaleString('en-IN')}/unit)`,
+          category: 'DID' as const,
+          quantity: didCount,
+          unitPrice: didUnitPrice,
+          total: didCharges,
+        }] : []),
       ],
-      paymentInstructions: 'ACH Wire Transfer / Silicon Valley Bank / Routing: 121000358 / Ref: ' + invNum,
+      paymentInstructions: 'RTGS/NEFT to ICICI Bank Current A/C: 001105029381 (IFSC: ICIC0000011) / Ref: ' + invNum,
     };
     setInvoices(prev => [newInvoice, ...prev]);
-    addAuditLog('Invoice Creation', 'None', `Created ${invNum} for ${newInvoice.clientName}`, invNum);
+    addAuditLog('Invoice Creation', 'None', `Created ${invNum} for ${newInvoice.clientName} (Total: ₹${totalAmount.toLocaleString('en-IN')})`, invNum);
   };
 
   const markInvoicePaid = (id: string) => {
     setInvoices(prev =>
       prev.map(inv => {
         if (inv.id === id) {
-          addAuditLog('Invoice Payment', `Status: ${inv.status}`, `Marked as Paid ($${inv.totalAmount.toLocaleString()})`, inv.invoiceNumber);
+          addAuditLog('Invoice Payment', `Status: ${inv.status}`, `Marked as Paid (₹${inv.totalAmount.toLocaleString('en-IN')})`, inv.invoiceNumber);
           return { ...inv, status: 'Paid', paidAmount: inv.totalAmount };
         }
         return inv;
@@ -635,22 +786,228 @@ Please save and bookmark your dedicated URL for instant access.
     );
   };
 
-  const sendInvoice = (id: string) => {
+  const markInvoiceUnpaid = (id: string) => {
     setInvoices(prev =>
       prev.map(inv => {
         if (inv.id === id) {
-          addAuditLog('Invoice Creation', `Status: ${inv.status}`, 'Status: Invoice Sent (Emailed to client AP)', inv.invoiceNumber);
-          return { ...inv, status: 'Invoice Sent' };
+          addAuditLog('Invoice Payment', `Status: ${inv.status}`, 'Marked as Unpaid', inv.invoiceNumber);
+          return { ...inv, status: 'Unpaid', paidAmount: 0 };
         }
         return inv;
       })
     );
   };
 
+  const sendInvoiceToClient = (id: string) => {
+    const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 16) + ' UTC';
+    setInvoices(prev =>
+      prev.map(inv => {
+        if (inv.id === id) {
+          addAuditLog('Invoice Creation', `Status: ${inv.status}`, `Dispatched to Client Portal (${inv.clientName})`, inv.invoiceNumber);
+          return {
+            ...inv,
+            status: 'Sent to Client',
+            sentToClientPortal: true,
+            sentToClientAt: timestamp,
+          };
+        }
+        return inv;
+      })
+    );
+  };
+
+  const sendInvoice = (id: string) => {
+    sendInvoiceToClient(id);
+  };
+
   const sendReminder = (id: string) => {
     const inv = invoices.find(i => i.id === id);
     if (inv) {
       addAuditLog('Invoice Creation', 'Reminder Dispatched', `Automated payment reminder sent to ${inv.clientEmail}`, inv.invoiceNumber);
+    }
+  };
+
+  const uploadPaymentProof = (invoiceId: string, proof: PaymentProof) => {
+    setInvoices(prev =>
+      prev.map(inv => {
+        if (inv.id === invoiceId) {
+          addAuditLog(
+            'Invoice Payment',
+            `Status: ${inv.status}`,
+            `Payment proof attached: UTR ${proof.utrNumber || 'N/A'} by ${inv.clientName}`,
+            inv.invoiceNumber
+          );
+          return {
+            ...inv,
+            status: 'Verification Pending',
+            paymentProof: proof,
+          };
+        }
+        return inv;
+      })
+    );
+    createAlert({
+      title: `Payment Proof Uploaded: ${invoiceId}`,
+      description: `Client submitted payment screenshot & UTR reference ${proof.utrNumber || 'N/A'}. Awaiting Admin Verification in Invoices panel.`,
+      category: 'Failed Payment',
+      severity: 'Medium',
+      targetResource: invoiceId,
+    });
+  };
+
+  const verifyPaymentProof = (invoiceId: string) => {
+    const inv = invoices.find(i => i.id === invoiceId);
+    if (!inv) return;
+    const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 16) + ' UTC';
+    setInvoices(prev =>
+      prev.map(i => {
+        if (i.id === invoiceId) {
+          addAuditLog(
+            'Invoice Payment',
+            'Verification Pending',
+            `Admin ${currentUser.name} verified payment proof & marked Paid (₹${i.totalAmount.toLocaleString('en-IN')})`,
+            i.invoiceNumber
+          );
+          return {
+            ...i,
+            status: 'Paid',
+            paidAmount: i.totalAmount,
+            verifiedBy: currentUser.name,
+            verifiedAt: nowStr,
+          };
+        }
+        return i;
+      })
+    );
+    createPayment({
+      invoiceNumber: inv.invoiceNumber,
+      clientName: inv.clientName,
+      amount: inv.totalAmount,
+      method: 'NEFT / RTGS',
+      referenceNumber: inv.paymentProof?.utrNumber || `VERIFIED-${Date.now()}`,
+      status: 'Settled',
+      verifiedBy: currentUser.name,
+    });
+  };
+
+  const rejectPaymentProof = (invoiceId: string, reason: string = 'Payment screenshot / UTR could not be verified with bank') => {
+    setInvoices(prev =>
+      prev.map(inv => {
+        if (inv.id === invoiceId) {
+          addAuditLog(
+            'Invoice Payment',
+            'Verification Pending',
+            `Admin rejected proof: ${reason}`,
+            inv.invoiceNumber
+          );
+          return {
+            ...inv,
+            status: 'Unpaid',
+            paymentProof: undefined,
+          };
+        }
+        return inv;
+      })
+    );
+  };
+
+  const changeUserPassword = (userId: string, newPass: string): { success: boolean; message: string } => {
+    const targetUser = users.find(u => u.id === userId);
+    if (!targetUser) {
+      return { success: false, message: 'User account not found.' };
+    }
+    // Strict restriction: Admin account credentials can only change in backend!
+    if (targetUser.role === 'Super Admin' || targetUser.id === 'usr-1') {
+      addAuditLog(
+        'System Configuration',
+        `User ${targetUser.email}`,
+        `Blocked UI password modification attempt on Root Admin (Backend Protected)`
+      );
+      return {
+        success: false,
+        message: 'Security Policy: Root Administrator credentials can only be changed via backend server configuration (ADMIN_ROOT_SECRET). Web UI modification is disabled.',
+      };
+    }
+
+    addAuditLog(
+      'System Configuration',
+      `User ${targetUser.email}`,
+      `Admin ${currentUser.name} updated account password`
+    );
+    return { success: true, message: `Password for ${targetUser.email} has been updated successfully.` };
+  };
+
+  const pingProviderApi = (providerId: string) => {
+    setProviders(prev =>
+      prev.map(p => {
+        if (p.id === providerId) {
+          const newLatency = Math.floor(Math.random() * 15 + 12);
+          const now = new Date().toISOString().replace('T', ' ').substring(0, 16) + ' UTC';
+          addAuditLog(
+            'Provider Changes',
+            `API Latency: ${p.apiLatencyMs}ms`,
+            `Ping Success: ${newLatency}ms (Status: Operational)`,
+            p.name
+          );
+          return {
+            ...p,
+            apiStatus: 'Operational',
+            apiLatencyMs: newLatency,
+            lastHeartbeat: now,
+          };
+        }
+        return p;
+      })
+    );
+  };
+
+  const simulateTrunkAlert = (type: 'sip_down' | 'poor_quality' | 'failed_provision') => {
+    if (type === 'sip_down') {
+      createAlert({
+        title: 'SIP Down: Tata Teleservices Mumbai Gateway Offline',
+        description: 'TRUNK-TATA-MUMBAI-01 primary SIP signaling endpoint unreachable (SIP 503 Service Unavailable / PRI Link Down). Failover active.',
+        category: 'SIP Down',
+        severity: 'Critical',
+        targetResource: 'TRUNK-TATA-MUMBAI-01',
+        trunkTelemetry: {
+          carrier: 'Tata Teleservices',
+          sipCode: 503,
+          trunkId: 'TRUNK-TATA-MUMBAI-01',
+          jitterMs: 92,
+          packetLossPct: 22.4,
+        },
+      });
+      addAuditLog('System Configuration', 'Trunk Online', 'Incoming Carrier Webhook: SIP Down on Tata Gateway', 'TRUNK-TATA-MUMBAI-01');
+    } else if (type === 'poor_quality') {
+      createAlert({
+        title: 'Poor Call Quality: Airtel Business Trunk High Jitter',
+        description: 'TRUNK-AIRTEL-DELHI-02 telemetry warning: MOS score degraded to 2.65, Jitter 68ms, Packet Loss 8.1% on active calls.',
+        category: 'Poor Call Quality',
+        severity: 'High',
+        targetResource: 'TRUNK-AIRTEL-DELHI-02',
+        trunkTelemetry: {
+          carrier: 'Bharti Airtel Business',
+          mosScore: 2.65,
+          jitterMs: 68,
+          packetLossPct: 8.1,
+          trunkId: 'TRUNK-AIRTEL-DELHI-02',
+        },
+      });
+      addAuditLog('System Configuration', 'Normal Audio Quality', 'Incoming Carrier Webhook: Poor Call Quality MOS 2.65', 'TRUNK-AIRTEL-DELHI-02');
+    } else {
+      createAlert({
+        title: 'Failed Provisioning: 100 Indian DIDs Blocked on Jio Trunk',
+        description: 'Upstream carrier rejected batch allocation of 100 Indian DIDs. Reason: Entity KYC / CIR circle limit reached.',
+        category: 'Failed Provisioning',
+        severity: 'High',
+        targetResource: 'Jio Indian DIDs (+91 80)',
+        trunkTelemetry: {
+          carrier: 'Reliance Jio Enterprise',
+          sipCode: 488,
+          trunkId: 'TRUNK-JIO-BLR-03',
+        },
+      });
+      addAuditLog('System Configuration', 'Provisioning Active', 'Incoming Carrier Webhook: Failed Provisioning on Jio Trunk', 'TRUNK-JIO-BLR-03');
     }
   };
 
@@ -814,14 +1171,25 @@ Please save and bookmark your dedicated URL for instant access.
         releaseDid,
         suspendDid,
         portDid,
+        addSipProvider,
+        addDidNumber,
+        importDidNumbers,
         approveRequest,
         rejectRequest,
         holdRequest,
         createRequest,
         createInvoice,
         markInvoicePaid,
+        markInvoiceUnpaid,
         sendInvoice,
+        sendInvoiceToClient,
         sendReminder,
+        uploadPaymentProof,
+        verifyPaymentProof,
+        rejectPaymentProof,
+        changeUserPassword,
+        pingProviderApi,
+        simulateTrunkAlert,
         createPayment,
         acknowledgeAlert,
         resolveAlert,

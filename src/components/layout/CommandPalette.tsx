@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, X, Server, PhoneCall, Users, Receipt, ArrowRight } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { formatINR } from '../../data/mockData';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -91,7 +92,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
                     </div>
                   </div>
                   <span className="font-mono text-emerald-600 dark:text-emerald-400 tabular-nums">
-                    ${c.monthlySpend.toLocaleString()}/mo
+                    {formatINR(c.monthlySpend)}/mo
                   </span>
                 </button>
               ))}
@@ -145,7 +146,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="font-mono tabular-nums text-slate-900 dark:text-slate-100">
-                      ${i.totalAmount.toLocaleString()}
+                      {formatINR(i.totalAmount)}
                     </span>
                     <span className={`text-[10px] px-1.5 py-0.5 rounded ${
                       i.status === 'Paid' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'

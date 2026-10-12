@@ -598,7 +598,7 @@ ORDER BY channel_saturation_percent DESC;`,
                       <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                         {Object.values(row).map((val: any, vIdx) => (
                           <td key={vIdx} className="py-2 px-3 text-slate-800 dark:text-slate-200">
-                            {typeof val === 'number' ? `$${val.toLocaleString()}` : String(val)}
+                            {typeof val === 'number' ? `₹${val.toLocaleString('en-IN')}` : String(val)}
                           </td>
                         ))}
                       </tr>
@@ -645,18 +645,26 @@ ORDER BY channel_saturation_percent DESC;`,
           </div>
 
           {[
-            { method: 'GET', path: '/api/v1/gpus/inventory', desc: 'List all GPU nodes with real-time allocation status and margin math' },
-            { method: 'POST', path: '/api/v1/gpus/:id/allocate', desc: 'Allocate GPU node units to client; updates inventory and logs audit event' },
-            { method: 'POST', path: '/api/v1/gpus/:id/reclaim', desc: 'Reclaim allocated GPU nodes back to wholesale available inventory' },
-            { method: 'GET', path: '/api/v1/sips/trunks', desc: 'Get carrier trunks with active concurrent channel metrics' },
-            { method: 'POST', path: '/api/v1/dids/:id/assign', desc: 'Assign E.164 DID phone number block to client account' },
-            { method: 'POST', path: '/api/v1/invoices/generate', desc: 'Trigger automated monthly invoice creation with itemized PDF payload' },
-            { method: 'POST', path: '/api/v1/allocations/approve', desc: 'Authorize pending wholesale lease request (Super Admin / Ops Manager)' },
-            { method: 'GET', path: '/api/v1/finance/profitability', desc: 'Aggregate revenue, cost commitments, and gross spread matrix' },
+            { method: 'POST', path: '/api/auth/signup', desc: 'Register organization account, create initial admin, generate tenant organization_id' },
+            { method: 'POST', path: '/api/auth/login', desc: 'Authenticate user with bcrypt password verification and issue tenant-scoped JWT token' },
+            { method: 'GET', path: '/api/organizations', desc: 'List / view organization profiles with strict organization-level data isolation' },
+            { method: 'GET', path: '/api/users', desc: 'Manage users, roles (Super Admin, Ops, Client Portal), and granular permissions' },
+            { method: 'POST', path: '/api/api-keys', desc: 'Generate and revoke organization API keys for Dialko and compute automation' },
+            { method: 'GET', path: '/api/gpu/capacity', desc: 'Modular GPU provider layer (Lambda Labs, RunPod, CoreWeave) capacity & availability' },
+            { method: 'GET', path: '/api/gpu/usage', desc: 'Live GPU cluster telemetry, power draw (W), and allocated compute nodes' },
+            { method: 'GET', path: '/api/gpu/requests', desc: 'Incoming GPU capacity requests with approve/reject workflow states' },
+            { method: 'POST', path: '/api/gpu/allocations', desc: 'Transactional allocation of GPU node capacity preventing double assignment' },
+            { method: 'GET', path: '/api/did/requests', desc: 'Client DID requests pool awaiting administrator approval or rejection' },
+            { method: 'POST', path: '/api/did/allocations', desc: 'Automatically assign selected available DIDs to client upon request approval' },
+            { method: 'GET', path: '/api/did/numbers', desc: 'Full DID numbers inventory linked to carrier SIP trunk and allocated client' },
+            { method: 'GET', path: '/api/sip-trunks', desc: 'Wholesale SIP trunks with channel capacity (Tata, Airtel, Jio, Vi)' },
+            { method: 'GET', path: '/api/dialko/status', desc: 'Dialko AI voice gateway interconnect heartbeat and SIP latency' },
+            { method: 'GET', path: '/api/dialko/calls', desc: 'Real-time call routing, concurrent sessions, and trunk channel occupancy' },
+            { method: 'GET', path: '/api/dialko/agents', desc: 'Voice AI agents mapped to allocated DID numbers and carrier trunks' },
           ].map((endpoint, i) => (
             <div
               key={i}
-              className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg flex items-center justify-between"
+              className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-2 hover:border-cyan-500/40 transition-colors"
             >
               <div className="flex items-center gap-3">
                 <span
@@ -692,7 +700,7 @@ ORDER BY channel_saturation_percent DESC;`,
             <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
               <div className="font-bold text-cyan-600 dark:text-cyan-400">1. Upstream Acquisition</div>
               <p className="text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed">
-                Purchasing reserved blocks from RunPod, Lambda Labs, CoreWeave, Telnyx, Bandwidth at wholesale rates ($2,150/H100/mo, $1.20/DID). Long-term master commitments.
+                Purchasing reserved blocks from E2E Networks, Yotta, CtrlS, Tata Teleservices, Airtel Business at wholesale rates (₹1,75,000/H100/mo, ₹85/DID). Long-term master commitments.
               </p>
             </div>
 
@@ -706,7 +714,7 @@ ORDER BY channel_saturation_percent DESC;`,
             <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
               <div className="font-bold text-emerald-600 dark:text-emerald-400">3. Downstream Client Billing</div>
               <p className="text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed">
-                Reselling to AI research labs and voice contact platforms ($3,200/H100/mo, $3.50/DID) generating 34.5% gross arbitrage margin with automated itemized billing.
+                Reselling to AI research labs and voice contact platforms (₹2,60,000/H100/mo, ₹140/DID) generating 34.5% gross arbitrage margin with automated itemized billing.
               </p>
             </div>
           </div>

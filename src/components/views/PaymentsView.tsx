@@ -13,6 +13,7 @@ import { useApp } from '../../context/AppContext';
 import { MetricCard } from '../common/MetricCard';
 import { StatusBadge } from '../common/StatusBadge';
 import { Payment } from '../../types';
+import { formatINR } from '../../data/mockData';
 
 export const PaymentsView: React.FC = () => {
   const { payments, invoices, createPayment } = useApp();
@@ -23,10 +24,10 @@ export const PaymentsView: React.FC = () => {
   const [showRecordModal, setShowRecordModal] = useState(false);
 
   const [newPayment, setNewPayment] = useState<Partial<Payment>>({
-    invoiceNumber: invoices[0]?.invoiceNumber || 'INV-2026-0891',
-    clientName: invoices[0]?.clientName || 'HyperScale AI Inc.',
-    amount: 10000,
-    method: 'ACH Wire Transfer',
+    invoiceNumber: invoices[0]?.invoiceNumber || 'INV-2026-0892',
+    clientName: invoices[0]?.clientName || 'CognitiveScale AI Labs',
+    amount: invoices[0]?.totalAmount || 250000,
+    method: 'NEFT / RTGS',
     referenceNumber: '',
     status: 'Settled',
   });
@@ -73,7 +74,7 @@ export const PaymentsView: React.FC = () => {
             Payment Settlements &amp; Remittance Ledger
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Real-time reconciliation of Fedwire, ACH, SWIFT, and Stripe transactions.
+            Real-time reconciliation of IMPS/UPI, NEFT/RTGS, Corporate NetBanking, and Direct Bank Wire transactions.
           </p>
         </div>
         <button
@@ -87,10 +88,10 @@ export const PaymentsView: React.FC = () => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <MetricCard label="Collected / Settled" value={`$${collectedAmount.toLocaleString()}`} subValue="Cleared to bank" highlight badge="Settled" />
-        <MetricCard label="Pending Settlement" value={`$${pendingAmount.toLocaleString()}`} subValue="ACH in transit" badge="Processing" />
-        <MetricCard label="Failed / Rejected" value={`$${failedAmount.toLocaleString()}`} subValue="Requires manual inquiry" badge="Failed" />
-        <MetricCard label="Reconciliation Rate" value="98.2%" subValue="Auto-matched by Ref ID" badge="Ledger" />
+        <MetricCard label="Collected / Settled" value={formatINR(collectedAmount)} subValue="Cleared to bank" highlight badge="Settled" />
+        <MetricCard label="Pending Settlement" value={formatINR(pendingAmount)} subValue="NEFT in transit" badge="Processing" />
+        <MetricCard label="Failed / Rejected" value={formatINR(failedAmount)} subValue="Requires manual inquiry" badge="Failed" />
+        <MetricCard label="Reconciliation Rate" value="98.2%" subValue="Auto-matched by UTR" badge="Ledger" />
       </div>
 
       {/* Filter and Search Bar */}
@@ -99,7 +100,7 @@ export const PaymentsView: React.FC = () => {
           <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
           <input
             type="text"
-            placeholder="Search Payment ID (PMT-XXXX), Invoice, Client, or Fedwire Ref..."
+            placeholder="Search Payment ID (PMT-XXXX), Invoice, Client, or UTR / Wire Ref..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-md text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 outline-hidden"
@@ -114,9 +115,10 @@ export const PaymentsView: React.FC = () => {
             className="px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-700 dark:text-slate-300 outline-hidden"
           >
             <option value="All">All Methods</option>
-            <option value="ACH Wire Transfer">ACH Wire</option>
-            <option value="SWIFT Fedwire">SWIFT</option>
-            <option value="Corporate Card">Corporate Card</option>
+            <option value="NEFT / RTGS">NEFT / RTGS</option>
+            <option value="IMPS / UPI">IMPS / UPI</option>
+            <option value="Corporate NetBanking">Corporate NetBanking</option>
+            <option value="ACH Wire Transfer">ACH Wire Transfer</option>
           </select>
         </div>
       </div>
@@ -150,7 +152,7 @@ export const PaymentsView: React.FC = () => {
                     {p.clientName}
                   </td>
                   <td className="py-2.5 px-3 text-right font-mono tabular-nums font-bold text-emerald-600 dark:text-emerald-400">
-                    ${p.amount.toLocaleString()}
+                    {formatINR(p.amount)}
                   </td>
                   <td className="py-2.5 px-3 text-slate-500 font-mono text-[11px]">
                     {p.date}
@@ -179,7 +181,7 @@ export const PaymentsView: React.FC = () => {
               Record Client Remittance
             </h3>
             <p className="text-xs text-slate-500 mb-4">
-              Enter settlement confirmation received from Silicon Valley Bank or Stripe.
+              Enter bank settlement confirmation (UTR/IMPS/RTGS) received from HDFC, ICICI, SBI, or Axis.
             </p>
 
             <form onSubmit={handleRecordSubmit} className="space-y-3 text-xs">
@@ -194,21 +196,21 @@ export const PaymentsView: React.FC = () => {
                       ...newPayment,
                       invoiceNumber: e.target.value,
                       clientName: inv?.clientName || '',
-                      amount: inv?.totalAmount || 10000,
+                      amount: inv?.totalAmount || 100000,
                     });
                   }}
                   className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100 font-mono"
                 >
                   {invoices.map(i => (
                     <option key={i.id} value={i.invoiceNumber}>
-                      {i.invoiceNumber} — {i.clientName} (${i.totalAmount.toLocaleString()})
+                      {i.invoiceNumber} — {i.clientName} ({formatINR(i.totalAmount)})
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-slate-600 dark:text-slate-300 mb-1 font-medium">Settled Amount ($)</label>
+                <label className="block text-slate-600 dark:text-slate-300 mb-1 font-medium">Settled Amount (₹ INR)</label>
                 <input
                   type="number"
                   value={newPayment.amount}
@@ -225,9 +227,10 @@ export const PaymentsView: React.FC = () => {
                     onChange={e => setNewPayment({ ...newPayment, method: e.target.value as any })}
                     className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100"
                   >
+                    <option value="NEFT / RTGS">NEFT / RTGS</option>
+                    <option value="IMPS / UPI">IMPS / UPI</option>
+                    <option value="Corporate NetBanking">Corporate NetBanking</option>
                     <option value="ACH Wire Transfer">ACH Wire Transfer</option>
-                    <option value="SWIFT Fedwire">SWIFT Fedwire</option>
-                    <option value="Corporate Card">Corporate Card</option>
                   </select>
                 </div>
                 <div>
@@ -245,11 +248,11 @@ export const PaymentsView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-slate-600 dark:text-slate-300 mb-1 font-medium">Reference Number (Fedwire / ACH)</label>
+                <label className="block text-slate-600 dark:text-slate-300 mb-1 font-medium">UTR / Transaction Reference</label>
                 <input
                   required
                   type="text"
-                  placeholder="e.g. FEDWIRE-993810294"
+                  placeholder="e.g. UTR-HDFC993810294"
                   value={newPayment.referenceNumber}
                   onChange={e => setNewPayment({ ...newPayment, referenceNumber: e.target.value })}
                   className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100 font-mono"

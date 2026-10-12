@@ -15,6 +15,7 @@ import { useApp } from '../../context/AppContext';
 import { MetricCard } from '../common/MetricCard';
 import { StatusBadge } from '../common/StatusBadge';
 import { GpuInventoryItem, GpuStatus } from '../../types';
+import { formatINR } from '../../data/mockData';
 
 export const GpuManagementView: React.FC = () => {
   const { gpus, clients, allocateGpu, reclaimGpu, transferGpu, auditLogs } = useApp();
@@ -212,10 +213,10 @@ export const GpuManagementView: React.FC = () => {
                         )}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-600 dark:text-slate-300">
-                        ${gpu.monthlyCost.toLocaleString()}/mo
+                        {formatINR(gpu.monthlyCost)}/mo
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono tabular-nums text-emerald-600 dark:text-emerald-400 font-semibold">
-                        ${gpu.sellingPrice.toLocaleString()}/mo
+                        {formatINR(gpu.sellingPrice)}/mo
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono tabular-nums font-semibold text-cyan-600 dark:text-cyan-400">
                         {gpu.marginPercent.toFixed(1)}%

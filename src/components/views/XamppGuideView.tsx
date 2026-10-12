@@ -298,15 +298,15 @@ echo json_encode(["message" => "GPU & SIP Wholesale API Running on XAMPP"]);
         <div class="grid grid-cols-4 gap-4 text-center">
             <div class="bg-slate-800 p-4 rounded-lg border border-slate-700">
                 <div class="text-xs text-slate-400">Total Monthly Revenue</div>
-                <div class="text-2xl font-bold text-emerald-400">$373,500</div>
+                <div class="text-2xl font-bold text-emerald-400">₹37,35,000</div>
             </div>
             <div class="bg-slate-800 p-4 rounded-lg border border-slate-700">
                 <div class="text-xs text-slate-400">Wholesale Provider Cost</div>
-                <div class="text-2xl font-bold text-rose-400">$244,800</div>
+                <div class="text-2xl font-bold text-rose-400">₹24,48,000</div>
             </div>
             <div class="bg-slate-800 p-4 rounded-lg border border-slate-700">
                 <div class="text-xs text-slate-400">Gross Resale Profit</div>
-                <div class="text-2xl font-bold text-cyan-400">$128,700</div>
+                <div class="text-2xl font-bold text-cyan-400">₹12,87,000</div>
             </div>
             <div class="bg-slate-800 p-4 rounded-lg border border-slate-700">
                 <div class="text-xs text-slate-400">Arbitrage Margin</div>
