@@ -1,0 +1,1044 @@
+import React, { useState, useEffect } from 'react';
+import {
+  UserCircle2,
+  Server,
+  PhoneCall,
+  Receipt,
+  Plus,
+  Send,
+  CheckCircle2,
+  Clock,
+  Download,
+  AlertCircle,
+  Activity,
+  Layers,
+  Lock,
+  Mail,
+  Eye,
+  EyeOff,
+  LogOut,
+  KeyRound,
+  ShieldCheck,
+  Building2,
+  ArrowRight,
+  ExternalLink,
+  Save,
+  Check,
+  Copy,
+  Share2,
+  Link2,
+} from 'lucide-react';
+import { useApp } from '../../context/AppContext';
+import { MetricCard } from '../common/MetricCard';
+import { StatusBadge } from '../common/StatusBadge';
+import { Client } from '../../types';
+
+export const ClientPortalView: React.FC = () => {
+  const {
+    clients,
+    gpus,
+    dids,
+    invoices,
+    pendingRequests,
+    createRequest,
+    approveRequest,
+    authenticatedClient,
+    clientLogin,
+    clientLogout,
+    updateClientCredentials,
+    setActiveTab,
+    targetClientIdFromUrl,
+    setTargetClientIdFromUrl,
+    getClientPortalUrl,
+    getClientShareMessage,
+    returnToBrokerAdmin,
+  } = useApp();
+
+  // Login form state
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
+  const [copiedInvite, setCopiedInvite] = useState(false);
+
+  // If a specific client ID is targeted in the URL, identify it
+  const targetedClient = targetClientIdFromUrl
+    ? clients.find(
+        c =>
+          c.id === targetClientIdFromUrl ||
+          c.companyName.toLowerCase().replace(/\s+/g, '-').includes(targetClientIdFromUrl.toLowerCase())
+      ) || null
+    : null;
+
+  useEffect(() => {
+    if (targetedClient && !authenticatedClient) {
+      setLoginEmail(targetedClient.portalUsername || targetedClient.email);
+    }
+  }, [targetedClient, authenticatedClient]);
+
+  // Portal view active tab
+  const [activeTabPortal, setActiveTabPortal] = useState<'requests' | 'resources' | 'billing' | 'security'>('requests');
+
+  // Modals for raising requests
+  const [showGpuRequestModal, setShowGpuRequestModal] = useState(false);
+  const [showSipRequestModal, setShowSipRequestModal] = useState(false);
+  const [requestSubmittedMessage, setRequestSubmittedMessage] = useState<string | null>(null);
+
+  // Password update state
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [passwordSavedMessage, setPasswordSavedMessage] = useState<string | null>(null);
+
+  // New GPU Request Form
+  const [gpuModelReq, setGpuModelReq] = useState('NVIDIA H100 SXM5 80GB');
+  const [gpuQuantityReq, setGpuQuantityReq] = useState(8);
+  const [gpuDurationReq, setGpuDurationReq] = useState('3 Months Reserved');
+  const [gpuNotesReq, setGpuNotesReq] = useState('');
+
+  // New SIP/DID Request Form
+  const [sipChannelsReq, setSipChannelsReq] = useState(500);
+  const [didCountReq, setDidCountReq] = useState(50);
+  const [didCountryReq, setDidCountryReq] = useState('United States (Local 415/212)');
+  const [sipNotesReq, setSipNotesReq] = useState('');
+
+  const handleLoginSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError(null);
+    setIsLoggingIn(true);
+
+    setTimeout(() => {
+      const res = clientLogin(loginEmail, loginPassword);
+      if (!res.success) {
+        setLoginError(res.error || 'Authentication failed. Please verify credentials.');
+      } else {
+        setLoginError(null);
+        setLoginPassword('');
+      }
+      setIsLoggingIn(false);
+    }, 200);
+  };
+
+  const handleFillDemo = (client: Client) => {
+    setLoginEmail(client.portalUsername || client.email);
+    setLoginPassword(client.portalPassword || 'HyperScale@2026');
+    setLoginError(null);
+  };
+
+  const handleQuickLogin = (client: Client) => {
+    const user = client.portalUsername || client.email;
+    const pass = client.portalPassword || 'HyperScale@2026';
+    clientLogin(user, pass);
+  };
+
+  // If NOT authenticated, render the dedicated Client Portal Login Screen
+  if (!authenticatedClient) {
+    return (
+      <div className="min-h-[85vh] flex flex-col items-center justify-center p-4 space-y-4">
+        {/* Top Operator Bar */}
+        <div className="w-full max-w-xl p-3 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between text-xs text-slate-300 shadow-md">
+          <div className="flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-cyan-400 shrink-0" />
+            <span className="font-semibold text-white">Dedicated Client Portal URL</span>
+            <span className="text-slate-500 hidden sm:inline">| Standalone Mode</span>
+          </div>
+          <button
+            onClick={() => returnToBrokerAdmin('clients')}
+            className="px-2.5 py-1 text-[11px] font-semibold text-white bg-cyan-600 hover:bg-cyan-500 rounded-lg transition-colors flex items-center gap-1 shadow-xs"
+          >
+            ← Return to Broker Console
+          </button>
+        </div>
+
+        <div className="w-full max-w-xl space-y-5">
+          {/* Brand header */}
+          <div className="text-center space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-100 dark:bg-cyan-950/60 text-cyan-800 dark:text-cyan-300 text-xs font-semibold border border-cyan-200 dark:border-cyan-800">
+              <Lock className="w-3.5 h-3.5" />
+              <span>Dedicated Client Self-Service Access</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+              {targetedClient ? `${targetedClient.companyName} Portal` : 'Client Infrastructure Portal'}
+            </h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+              {targetedClient
+                ? `Authorized infrastructure portal for ${targetedClient.companyName}. Sign in with your assigned credentials to submit GPU and SIP requests.`
+                : 'Sign in with your company-specific client credentials to view allocated GPU nodes, manage SIP phone lines, and request capacity expansions.'}
+            </p>
+          </div>
+
+          {/* Dedicated URL Chip if targeted */}
+          {targetedClient && (
+            <div className="p-3 bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800 rounded-xl space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-200 dark:bg-cyan-900 text-cyan-900 dark:text-cyan-200 font-bold uppercase">
+                  Targeted Client Account
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setTargetClientIdFromUrl(null)}
+                  className="text-[11px] text-cyan-700 dark:text-cyan-400 hover:underline font-medium"
+                >
+                  Switch Account
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between gap-2">
+                <div className="truncate">
+                  <div className="font-bold text-slate-900 dark:text-slate-100">{targetedClient.companyName}</div>
+                  <div className="text-[11px] text-slate-500 font-mono">
+                    Contact: {targetedClient.contactPerson} ({targetedClient.email})
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(getClientPortalUrl(targetedClient.id));
+                    setCopiedUrl(true);
+                    setTimeout(() => setCopiedUrl(false), 2000);
+                  }}
+                  className="shrink-0 px-2.5 py-1 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-200 font-semibold text-[11px] flex items-center gap-1 transition-colors"
+                >
+                  {copiedUrl ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                  <span>{copiedUrl ? 'URL Copied!' : 'Copy Dedicated URL'}</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Login Card */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl p-6 sm:p-8 space-y-5">
+            {loginError && (
+              <div className="p-3 bg-rose-50 dark:bg-rose-950/50 border border-rose-300 dark:border-rose-800 rounded-lg text-rose-800 dark:text-rose-300 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{loginError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 mb-1.5 font-semibold">
+                  Company Email or Portal Username
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <input
+                    required
+                    type="text"
+                    value={loginEmail}
+                    onChange={e => setLoginEmail(e.target.value)}
+                    placeholder="e.g. sjenkins@hyperscale.ai"
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 outline-hidden focus:border-cyan-500 font-mono text-xs"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className="block text-slate-700 dark:text-slate-300 font-semibold">
+                    Portal Access Password
+                  </label>
+                  <span className="text-[11px] text-slate-400">Case-sensitive</span>
+                </div>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <input
+                    required
+                    type={showPassword ? 'text' : 'password'}
+                    value={loginPassword}
+                    onChange={e => setLoginPassword(e.target.value)}
+                    placeholder="••••••••••••"
+                    className="w-full pl-9 pr-10 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 outline-hidden focus:border-cyan-500 font-mono text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoggingIn}
+                className="w-full py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-semibold text-xs transition-colors flex items-center justify-center gap-2 shadow-xs"
+              >
+                {isLoggingIn ? (
+                  <span>Authenticating Client...</span>
+                ) : (
+                  <>
+                    <KeyRound className="w-3.5 h-3.5" />
+                    <span>Sign In to Client Portal</span>
+                  </>
+                )}
+              </button>
+
+              {/* Targeted client 1-click test button */}
+              {targetedClient && (
+                <button
+                  type="button"
+                  onClick={() => handleQuickLogin(targetedClient)}
+                  className="w-full py-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 rounded-lg font-semibold text-xs transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>1-Click Test Login as {targetedClient.companyName}</span>
+                </button>
+              )}
+            </form>
+
+            {/* Quick Demo Credentials Panel */}
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-2">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
+                  Test Credentials (Click to Auto-Fill &amp; Login)
+                </span>
+                <span className="text-cyan-600 dark:text-cyan-400 font-medium">1-Click Test</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                {clients.slice(0, 4).map(c => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => handleQuickLogin(c)}
+                    className="p-2 text-left bg-slate-50 dark:bg-slate-800/60 hover:bg-cyan-50 dark:hover:bg-cyan-950/40 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors group"
+                  >
+                    <div className="font-bold text-slate-900 dark:text-slate-100 group-hover:text-cyan-600 dark:group-hover:text-cyan-400 flex items-center justify-between">
+                      <span className="truncate">{c.companyName}</span>
+                      <ArrowRight className="w-3 h-3 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-500 truncate">
+                      {c.portalUsername || c.email}
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400">
+                      Pass: <span className="text-slate-600 dark:text-slate-300 font-semibold">{c.portalPassword || 'HyperScale@2026'}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Link back to admin platform */}
+          <div className="text-center text-xs text-slate-500">
+            <span>Are you a wholesale broker operator? </span>
+            <button
+              onClick={() => returnToBrokerAdmin('clients')}
+              className="text-cyan-600 dark:text-cyan-400 font-semibold hover:underline"
+            >
+              Go to Broker Admin Console →
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // LOGGED IN CLIENT VIEW
+  const client = authenticatedClient;
+  const clientGpus = gpus.filter(g => g.assignedClient === client.companyName);
+  const clientDids = dids.filter(d => d.assignedClient === client.companyName);
+  const clientInvoices = invoices.filter(i => i.clientId === client.id || i.clientName === client.companyName);
+  const clientRequests = pendingRequests.filter(r => r.clientId === client.id || r.clientName === client.companyName);
+  const totalGpuUnits = clientGpus.reduce((sum, g) => sum + g.allocatedQuantity, 0);
+
+  const handleRaiseGpuSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    createRequest({
+      clientId: client.id,
+      clientName: client.companyName,
+      resourceType: 'GPU Cluster',
+      specs: `${gpuQuantityReq}x ${gpuModelReq} (${gpuDurationReq})`,
+      quantity: gpuQuantityReq,
+      monthlyCost: gpuQuantityReq * 2150,
+      sellingPrice: gpuQuantityReq * 3200,
+      notes: gpuNotesReq || `Direct client request submitted by ${client.contactPerson}`,
+    });
+
+    setShowGpuRequestModal(false);
+    setRequestSubmittedMessage(`GPU Cluster request for ${gpuQuantityReq}x ${gpuModelReq} successfully submitted to the wholesale broker!`);
+    setTimeout(() => setRequestSubmittedMessage(null), 4000);
+  };
+
+  const handleRaiseSipSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    createRequest({
+      clientId: client.id,
+      clientName: client.companyName,
+      resourceType: 'SIP Trunk',
+      specs: `${sipChannelsReq} Channels + ${didCountReq} DIDs (${didCountryReq})`,
+      quantity: sipChannelsReq,
+      monthlyCost: Math.round(sipChannelsReq * 2.5),
+      sellingPrice: Math.round(sipChannelsReq * 4.2),
+      notes: sipNotesReq || `Voice capacity expansion submitted by ${client.contactPerson}`,
+    });
+
+    setShowSipRequestModal(false);
+    setRequestSubmittedMessage(`SIP & DID request for ${sipChannelsReq} channels submitted to the wholesale broker!`);
+    setTimeout(() => setRequestSubmittedMessage(null), 4000);
+  };
+
+  const handleUpdatePassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPasswordInput.trim()) return;
+    updateClientCredentials(client.id, client.portalUsername || client.email, newPasswordInput.trim());
+    setPasswordSavedMessage('Portal password successfully updated.');
+    setNewPasswordInput('');
+    setTimeout(() => setPasswordSavedMessage(null), 3000);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Top Operator Banner */}
+      <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300 shadow-lg">
+        <div className="flex items-center gap-2">
+          <Building2 className="w-4 h-4 text-cyan-400 shrink-0" />
+          <span className="font-semibold text-white">Client Portal Active:</span>
+          <span className="text-cyan-300 font-bold">{client.companyName}</span>
+          <span className="text-slate-500 hidden sm:inline">·</span>
+          <span className="text-slate-400 font-mono text-[11px] hidden md:inline truncate max-w-sm">
+            {getClientPortalUrl(client.id)}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(getClientPortalUrl(client.id));
+              setCopiedUrl(true);
+              setTimeout(() => setCopiedUrl(false), 2000);
+            }}
+            className="px-2.5 py-1 text-[11px] font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg transition-colors flex items-center gap-1"
+          >
+            {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            <span>{copiedUrl ? 'URL Copied!' : 'Copy Dedicated URL'}</span>
+          </button>
+          <button
+            onClick={() => returnToBrokerAdmin('clients')}
+            className="px-2.5 py-1 text-[11px] font-semibold bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg transition-colors flex items-center gap-1 shadow-xs"
+          >
+            <span>Broker Console →</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Client Identity & Panel Header */}
+      <div className="p-5 rounded-xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border border-slate-700 text-white flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+        <div>
+          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 uppercase tracking-wider flex items-center gap-1 font-semibold">
+              <ShieldCheck className="w-3 h-3 text-emerald-400" />
+              Authenticated Session
+            </span>
+            <span className="text-xs text-slate-300 font-medium">Logged in as: <strong>{client.contactPerson}</strong></span>
+            <span className="text-slate-500 text-xs">({client.email})</span>
+          </div>
+          <h2 className="text-2xl font-bold tracking-tight">{client.companyName}</h2>
+          <div className="flex items-center gap-3 text-xs text-slate-300 mt-1">
+            <span>Resource Need: <strong>{client.resourceRequirement}</strong></span>
+            <span>·</span>
+            <span>Account Status: <strong className="text-emerald-400">{client.status}</strong></span>
+          </div>
+        </div>
+
+        {/* Header Action Buttons */}
+        <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(getClientPortalUrl(client.id));
+              setCopiedUrl(true);
+              setTimeout(() => setCopiedUrl(false), 2000);
+            }}
+            className="px-3 py-1.5 text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-600 transition-colors flex items-center gap-1.5"
+            title="Copy Shareable Link"
+          >
+            {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5 text-cyan-400" />}
+            <span>{copiedUrl ? 'Copied Link!' : 'Share URL'}</span>
+          </button>
+          <button
+            onClick={clientLogout}
+            className="px-3 py-1.5 text-xs font-semibold text-rose-300 hover:text-white bg-rose-950/60 hover:bg-rose-900 border border-rose-800 rounded-lg transition-colors flex items-center gap-1.5"
+            title="Sign Out of Client Portal"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Sign Out</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Primary Actions: Raise GPU / Raise SIP Request */}
+      <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div>
+          <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+            Request Additional Infrastructure from Wholesale Broker
+          </h3>
+          <p className="text-xs text-slate-500">
+            Submit capacity requests for high-performance GPU nodes or telecom DID phone lines.
+          </p>
+        </div>
+        <div className="flex items-center gap-2.5 w-full sm:w-auto">
+          <button
+            onClick={() => setShowGpuRequestModal(true)}
+            className="flex-1 sm:flex-initial px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs transition-colors"
+          >
+            <Server className="w-3.5 h-3.5" />
+            <span>+ Raise GPU Request</span>
+          </button>
+          <button
+            onClick={() => setShowSipRequestModal(true)}
+            className="flex-1 sm:flex-initial px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs transition-colors"
+          >
+            <PhoneCall className="w-3.5 h-3.5" />
+            <span>+ Raise SIP / DID Request</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Success Notification */}
+      {requestSubmittedMessage && (
+        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 rounded-lg text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{requestSubmittedMessage}</span>
+        </div>
+      )}
+
+      {/* Quick KPI Overview */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <MetricCard label="Active Dedicated GPUs" value={`${totalGpuUnits} Nodes`} subValue={clientGpus.length > 0 ? clientGpus[0].gpuModel : 'None'} highlight badge="Compute" />
+        <MetricCard label="Active DID Numbers" value={`${clientDids.length} Numbers`} subValue="Inbound VoIP lines" badge="Telecom" />
+        <MetricCard label="Monthly Billing" value={`$${client.monthlySpend.toLocaleString()}`} subValue="Active contracts" badge="Billing" />
+        <MetricCard label="Pending Requests" value={clientRequests.filter(r => r.status === 'Pending').length} subValue="Awaiting broker review" badge="Queue" />
+      </div>
+
+      {/* Navigation Sub-Tabs */}
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2 text-xs overflow-x-auto">
+        {[
+          { id: 'requests', label: `My Submitted Requests (${clientRequests.length})` },
+          { id: 'resources', label: `Allocated Infrastructure (${clientGpus.length + clientDids.length})` },
+          { id: 'billing', label: `Invoices & Receipts (${clientInvoices.length})` },
+          { id: 'security', label: 'Portal Credentials & Security' },
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTabPortal(tab.id as any)}
+            className={`px-3 py-1.5 rounded font-medium transition-colors whitespace-nowrap ${
+              activeTabPortal === tab.id
+                ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 font-semibold'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab 1: Requests & Tracking */}
+      {activeTabPortal === 'requests' && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
+          <div className="p-3 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center text-xs">
+            <span className="font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[11px]">
+              My Resource Requests Status (Real-Time Broker Sync)
+            </span>
+            <span className="text-slate-400 text-[11px]">Auto-updates when Broker Approves</span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-400 font-medium">
+                  <th className="py-2.5 px-3">Request ID</th>
+                  <th className="py-2.5 px-3">Resource Type</th>
+                  <th className="py-2.5 px-3">Requested Specifications</th>
+                  <th className="py-2.5 px-3 text-right">Quantity</th>
+                  <th className="py-2.5 px-3 text-right">Est. Monthly Rate</th>
+                  <th className="py-2.5 px-3">Date Submitted</th>
+                  <th className="py-2.5 px-3">Broker Status</th>
+                  <th className="py-2.5 px-3 text-right">Workflow Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-sans">
+                {clientRequests.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-8 text-center text-slate-400">
+                      You haven't submitted any resource requests yet. Click <strong>+ Raise GPU Request</strong> or <strong>+ Raise SIP / DID Request</strong> above.
+                    </td>
+                  </tr>
+                ) : (
+                  clientRequests.map(req => (
+                    <tr key={req.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                      <td className="py-2.5 px-3 font-mono font-bold text-slate-900 dark:text-slate-100">
+                        {req.requestId}
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <span className="font-semibold text-cyan-600 dark:text-cyan-400">
+                          {req.resourceType}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-700 dark:text-slate-300">
+                        <div>{req.specs}</div>
+                        {req.notes && (
+                          <div className="text-[10px] text-slate-400 italic mt-0.5">
+                            Note: {req.notes}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono tabular-nums font-semibold text-slate-900 dark:text-slate-100">
+                        {req.quantity}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono tabular-nums font-bold text-emerald-600 dark:text-emerald-400">
+                        ${req.sellingPrice.toLocaleString()}/mo
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-400 font-mono text-[11px]">
+                        {req.date}
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <StatusBadge status={req.status} />
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        {req.status === 'Pending' ? (
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => approveRequest(req.id)}
+                              className="px-2 py-1 text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded flex items-center gap-1 transition-colors"
+                              title="Instantly approve and provision resource to this client"
+                            >
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>Test Approve</span>
+                            </button>
+                            <button
+                              onClick={() => setActiveTab('approvals')}
+                              className="px-2 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 rounded transition-colors"
+                            >
+                              Admin Desk
+                            </button>
+                          </div>
+                        ) : req.status === 'Approved' ? (
+                          <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                            ✓ Provisioned
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-slate-400">Archived</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 2: Active Allocated Resources */}
+      {activeTabPortal === 'resources' && (
+        <div className="space-y-4">
+          <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 mb-3 flex items-center gap-1.5">
+              <Server className="w-3.5 h-3.5 text-cyan-500" />
+              <span>Allocated GPU Nodes ({clientGpus.length})</span>
+            </h3>
+            {clientGpus.length === 0 ? (
+              <div className="p-6 text-center text-slate-400 text-xs">
+                No GPU nodes currently allocated. Use the "Raise GPU Request" button above to request compute nodes.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {clientGpus.map(g => (
+                  <div key={g.id} className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded border border-slate-200 dark:border-slate-800 flex justify-between items-center text-xs font-mono">
+                    <div>
+                      <div className="font-bold text-slate-900 dark:text-slate-100">{g.gpuId} — {g.gpuModel}</div>
+                      <div className="text-[10px] text-slate-400 font-sans">{g.region} · {g.vramGb}GB VRAM · Provider: {g.provider}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-emerald-600 dark:text-emerald-400 font-bold font-sans">${g.sellingPrice.toLocaleString()}/mo</div>
+                      <span className="px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 rounded text-[10px]">Active</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 mb-3 flex items-center gap-1.5">
+              <PhoneCall className="w-3.5 h-3.5 text-indigo-500" />
+              <span>Assigned DID Numbers &amp; Telecom Trunks ({clientDids.length})</span>
+            </h3>
+            {clientDids.length === 0 ? (
+              <div className="p-6 text-center text-slate-400 text-xs">
+                No DID telephone numbers currently assigned. Use the "Raise SIP / DID Request" button above.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                {clientDids.map(d => (
+                  <div key={d.id} className="p-2.5 bg-slate-50 dark:bg-slate-800/40 rounded border border-slate-200 dark:border-slate-800 text-xs font-mono flex justify-between items-center">
+                    <div>
+                      <div className="font-bold text-slate-900 dark:text-slate-100">{d.didNumber}</div>
+                      <div className="text-[10px] text-slate-400 font-sans">{d.country} · {d.type}</div>
+                    </div>
+                    <span className="text-[10px] px-1.5 py-0.5 bg-cyan-100 dark:bg-cyan-950 text-cyan-800 dark:text-cyan-300 rounded">Assigned</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tab 3: Billing & Invoices */}
+      {activeTabPortal === 'billing' && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
+          <div className="p-3 border-b border-slate-200 dark:border-slate-800 font-bold text-xs uppercase tracking-wider text-slate-700 dark:text-slate-300">
+            Corporate Invoices &amp; Billing History
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-400 font-medium">
+                  <th className="py-2.5 px-3">Invoice #</th>
+                  <th className="py-2.5 px-3">Billing Period</th>
+                  <th className="py-2.5 px-3 text-right">Amount</th>
+                  <th className="py-2.5 px-3">Due Date</th>
+                  <th className="py-2.5 px-3">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-sans">
+                {clientInvoices.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-slate-400">
+                      No invoices issued yet.
+                    </td>
+                  </tr>
+                ) : (
+                  clientInvoices.map(inv => (
+                    <tr key={inv.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <td className="py-2.5 px-3 font-mono font-bold text-slate-900 dark:text-slate-100">
+                        {inv.invoiceNumber}
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300 font-mono">
+                        {inv.billingPeriod}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                        ${inv.totalAmount.toLocaleString()}
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-500 font-mono text-[11px]">
+                        {inv.dueDate}
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <StatusBadge status={inv.status} />
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 4: Security & Portal Login Credentials */}
+      {activeTabPortal === 'security' && (
+        <div className="max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 sm:p-6 space-y-6 text-xs">
+          <div>
+            <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-1.5">
+              <KeyRound className="w-4 h-4 text-cyan-500" />
+              <span>Dedicated Portal URL &amp; Login Credentials</span>
+            </h3>
+            <p className="text-slate-500 text-xs mt-1">
+              Share this dedicated URL with your team members along with the credentials below to access the {client.companyName} self-service portal.
+            </p>
+          </div>
+
+          {passwordSavedMessage && (
+            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 rounded-lg text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center gap-2">
+              <Check className="w-4 h-4 text-emerald-600" />
+              <span>{passwordSavedMessage}</span>
+            </div>
+          )}
+
+          {/* Dedicated URL Card */}
+          <div className="p-4 bg-cyan-50/70 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800 rounded-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-200 dark:bg-cyan-900 text-cyan-900 dark:text-cyan-200 font-bold uppercase">
+                Your Direct Portal URL
+              </span>
+              <span className="text-[11px] text-cyan-700 dark:text-cyan-300 font-semibold">Unique to {client.companyName}</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                readOnly
+                type="text"
+                value={getClientPortalUrl(client.id)}
+                className="flex-1 px-3 py-2 bg-white dark:bg-slate-900 border border-cyan-300 dark:border-cyan-700 rounded-lg text-slate-900 dark:text-slate-100 font-mono text-xs select-all outline-hidden"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(getClientPortalUrl(client.id));
+                  setCopiedUrl(true);
+                  setTimeout(() => setCopiedUrl(false), 2000);
+                }}
+                className="px-3 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-xs shrink-0"
+              >
+                {copiedUrl ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedUrl ? 'Copied!' : 'Copy URL'}</span>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                const invite = getClientShareMessage(client);
+                navigator.clipboard.writeText(invite);
+                setCopiedInvite(true);
+                setTimeout(() => setCopiedInvite(false), 2000);
+              }}
+              className="w-full py-2 bg-white dark:bg-slate-900 hover:bg-cyan-100 dark:hover:bg-cyan-900/50 border border-cyan-300 dark:border-cyan-700 text-cyan-800 dark:text-cyan-200 font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-colors text-xs"
+            >
+              {copiedInvite ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Share2 className="w-3.5 h-3.5 text-cyan-600" />}
+              <span>{copiedInvite ? 'Full Invitation Copied to Clipboard!' : 'Copy Complete Invitation Message (URL + Credentials)'}</span>
+            </button>
+          </div>
+
+          {/* Credentials Display */}
+          <div className="space-y-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700/60 font-mono text-xs">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-slate-400 text-[11px] block">Portal Login Username / Email:</span>
+                <div className="font-bold text-slate-900 dark:text-slate-100 text-sm mt-0.5 select-all">
+                  {client.portalUsername || client.email}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(client.portalUsername || client.email);
+                  setCopiedUrl(true);
+                  setTimeout(() => setCopiedUrl(false), 1500);
+                }}
+                className="p-1.5 text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400 rounded"
+                title="Copy Username"
+              >
+                <Copy className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+              <div>
+                <span className="text-slate-400 text-[11px] block">Current Password:</span>
+                <div className="font-bold text-slate-900 dark:text-slate-100 text-sm mt-0.5 select-all">
+                  {client.portalPassword || 'HyperScale@2026'}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(client.portalPassword || 'HyperScale@2026');
+                  setCopiedUrl(true);
+                  setTimeout(() => setCopiedUrl(false), 1500);
+                }}
+                className="p-1.5 text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400 rounded"
+                title="Copy Password"
+              >
+                <Copy className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Update Password Form */}
+          <form onSubmit={handleUpdatePassword} className="space-y-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+            <h4 className="font-bold text-slate-800 dark:text-slate-200">Change Portal Password</h4>
+            <div>
+              <label className="block text-slate-600 dark:text-slate-400 mb-1 font-medium">New Password</label>
+              <input
+                required
+                type="text"
+                placeholder="Enter new secure password (e.g. MySecretPass@2026)"
+                value={newPasswordInput}
+                onChange={e => setNewPasswordInput(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 font-mono text-xs outline-hidden focus:border-cyan-500"
+              />
+            </div>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-semibold text-xs transition-colors flex items-center gap-1.5 shadow-xs"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>Update Password</span>
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* Modal: Raise GPU Request */}
+      {showGpuRequestModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl p-5">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-1 flex items-center gap-1.5">
+              <Server className="w-4 h-4 text-cyan-500" />
+              <span>Raise GPU Compute Cluster Request</span>
+            </h3>
+            <p className="text-xs text-slate-500 mb-4">
+              Submit your GPU cluster requirements to our wholesale broker team for rapid provisioning.
+            </p>
+
+            <form onSubmit={handleRaiseGpuSubmit} className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-600 dark:text-slate-300 mb-1 font-medium">GPU Architecture Model</label>
+                <select
+                  value={gpuModelReq}
+                  onChange={e => setGpuModelReq(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100"
+                >
+                  <option value="NVIDIA H100 SXM5 80GB">NVIDIA H100 SXM5 80GB (NVLink 900 GB/s)</option>
+                  <option value="NVIDIA A100 SXM4 80GB">NVIDIA A100 SXM4 80GB (NVLink 600 GB/s)</option>
+                  <option value="NVIDIA L40S 48GB Ada">NVIDIA L40S 48GB Ada (PCIe 4.0)</option>
+                  <option value="NVIDIA RTX 4090 24GB">NVIDIA RTX 4090 24GB (High Density)</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-600 dark:text-slate-300 mb-1 font-medium">GPU Quantity</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="128"
+                    value={gpuQuantityReq}
+                    onChange={e => setGpuQuantityReq(parseInt(e.target.value) || 1)}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-600 dark:text-slate-300 mb-1 font-medium">Commitment Period</label>
+                  <select
+                    value={gpuDurationReq}
+                    onChange={e => setGpuDurationReq(e.target.value)}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100"
+                  >
+                    <option value="1 Month Flex">1 Month Flex</option>
+                    <option value="3 Months Reserved">3 Months Reserved</option>
+                    <option value="6 Months Committed">6 Months Committed</option>
+                    <option value="12 Months Enterprise">12 Months Enterprise</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-600 dark:text-slate-300 mb-1 font-medium">Workload Notes / Network Requirements</label>
+                <textarea
+                  rows={2}
+                  value={gpuNotesReq}
+                  onChange={e => setGpuNotesReq(e.target.value)}
+                  placeholder="e.g. Distributed LLM pre-training, require 400Gbps InfiniBand cluster."
+                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowGpuRequestModal(false)}
+                  className="px-3 py-1.5 text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 text-xs font-semibold text-white bg-cyan-600 hover:bg-cyan-500 rounded-lg"
+                >
+                  Submit GPU Request
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Raise SIP Request */}
+      {showSipRequestModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl p-5">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-1 flex items-center gap-1.5">
+              <PhoneCall className="w-4 h-4 text-indigo-500" />
+              <span>Raise SIP Trunk &amp; DID Number Request</span>
+            </h3>
+            <p className="text-xs text-slate-500 mb-4">
+              Request voice carrier channels and E.164 phone numbers for inbound/outbound calling.
+            </p>
+
+            <form onSubmit={handleRaiseSipSubmit} className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-600 dark:text-slate-300 mb-1 font-medium">Concurrent Channels</label>
+                  <input
+                    type="number"
+                    min="50"
+                    step="50"
+                    value={sipChannelsReq}
+                    onChange={e => setSipChannelsReq(parseInt(e.target.value) || 50)}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-600 dark:text-slate-300 mb-1 font-medium">Quantity of DIDs</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={didCountReq}
+                    onChange={e => setDidCountReq(parseInt(e.target.value) || 1)}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-600 dark:text-slate-300 mb-1 font-medium">Country / Area Region</label>
+                <select
+                  value={didCountryReq}
+                  onChange={e => setDidCountryReq(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100"
+                >
+                  <option value="United States (Local 415/212)">United States (Local 415/212/312)</option>
+                  <option value="United States (Toll-Free 800/888)">United States (Toll-Free 800/888)</option>
+                  <option value="United Kingdom (+44 20 London)">United Kingdom (+44 20 London)</option>
+                  <option value="Germany (+49 30 Berlin)">Germany (+49 30 Berlin)</option>
+                  <option value="Singapore (+65 Local)">Singapore (+65 Local)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-600 dark:text-slate-300 mb-1 font-medium">Use Case / Call Volume Notes</label>
+                <textarea
+                  rows={2}
+                  value={sipNotesReq}
+                  onChange={e => setSipNotesReq(e.target.value)}
+                  placeholder="e.g. Inbound customer service call center expansion; high CPS required."
+                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSipRequestModal(false)}
+                  className="px-3 py-1.5 text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg"
+                >
+                  Submit Voice Request
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

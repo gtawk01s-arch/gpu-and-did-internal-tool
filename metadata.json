@@ -1,0 +1,6 @@
+{
+  "name": "GPU & SIP Wholesale Resource Management System",
+  "description": "Enterprise broker and reseller management platform for wholesale GPU compute clusters, SIP trunks, and DID telecom resources with real-time billing and profitability analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
