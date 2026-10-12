@@ -8,6 +8,7 @@ import {
   Client,
   PendingRequest,
   Provider,
+  CelerkoApiKey,
   Invoice,
   Payment,
   PaymentProof,
@@ -23,6 +24,7 @@ import {
   INITIAL_CLIENTS,
   INITIAL_PENDING_REQUESTS,
   INITIAL_PROVIDERS,
+  INITIAL_API_KEYS,
   INITIAL_INVOICES,
   INITIAL_PAYMENTS,
   INITIAL_ALERTS,
@@ -56,8 +58,14 @@ interface AppContextType {
   alerts: SystemAlert[];
   auditLogs: AuditLog[];
   supportTickets: SupportTicket[];
+  apiKeys: CelerkoApiKey[];
 
   // Mutators
+  createApiKey: (clientId: string, name: string) => { key: string; apiKeyObj: CelerkoApiKey };
+  revokeApiKey: (keyId: string) => void;
+  connectProviderApi: (providerId: string, endpoint: string, secretKey: string) => void;
+  updateProviderCapacity: (providerId: string, updates: Partial<Provider>) => void;
+
   allocateGpu: (id: string, clientName: string, quantity: number) => void;
   reclaimGpu: (id: string) => void;
   transferGpu: (id: string, targetClient: string) => void;
@@ -99,6 +107,8 @@ interface AppContextType {
   clientLogout: () => void;
   setAuthenticatedClient: (client: Client | null) => void;
   updateClientCredentials: (clientId: string, username: string, password: string) => void;
+  clearAllMockData: () => void;
+  restoreDemoData: () => void;
 
   // Dedicated Client URL & Portal Mode
   isClientPortalMode: boolean;
@@ -121,17 +131,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
 
-  const [gpus, setGpus] = useState<GpuInventoryItem[]>(INITIAL_GPU_INVENTORY);
-  const [sipProviders, setSipProviders] = useState<SipProvider[]>(INITIAL_SIP_PROVIDERS);
-  const [dids, setDids] = useState<DidNumber[]>(INITIAL_DID_NUMBERS);
-  const [clients, setClients] = useState<Client[]>(INITIAL_CLIENTS);
-  const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>(INITIAL_PENDING_REQUESTS);
-  const [providers, setProviders] = useState<Provider[]>(INITIAL_PROVIDERS);
-  const [invoices, setInvoices] = useState<Invoice[]>(INITIAL_INVOICES);
-  const [payments, setPayments] = useState<Payment[]>(INITIAL_PAYMENTS);
-  const [alerts, setAlerts] = useState<SystemAlert[]>(INITIAL_ALERTS);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(INITIAL_AUDIT_LOGS);
-  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>(INITIAL_SUPPORT_TICKETS);
+  const [gpus, setGpus] = useState<GpuInventoryItem[]>([]);
+const [sipProviders, setSipProviders] = useState<SipProvider[]>([]);
+const [dids, setDids] = useState<DidNumber[]>([]);
+const [clients, setClients] = useState<Client[]>([]);
+const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [alerts, setAlerts] = useState<SystemAlert[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
+  const [apiKeys, setApiKeys] = useState<CelerkoApiKey[]>([]);
 
   const [authenticatedClient, setAuthenticatedClient] = useState<Client | null>(null);
 
@@ -961,6 +972,139 @@ Please save and bookmark your dedicated URL for instant access.
     );
   };
 
+  const createApiKey = (clientId: string, name: string): { key: string; apiKeyObj: CelerkoApiKey } => {
+    const client = clients.find(c => c.id === clientId);
+    const hex = Math.random().toString(16).substring(2, 10) + Math.random().toString(16).substring(2, 10);
+    const fullKey = `ck_live_${hex}`;
+    const keyPrefix = fullKey.substring(0, 16);
+    const keyMasked = `${keyPrefix}••••••••••••••••${fullKey.slice(-4)}`;
+    const hasAllocation = (client?.allocatedGpuCount || 0) > 0;
+
+    const newApiKey: CelerkoApiKey = {
+      id: `key-${Date.now()}`,
+      clientId,
+      clientName: client?.companyName || 'Unknown Client',
+      name: name.trim() || 'Production API Key',
+      keyPrefix,
+      keyMasked,
+      createdAt: new Date().toISOString().split('T')[0],
+      lastUsed: 'Never',
+      status: 'Active',
+      hasActiveGpuAllocation: hasAllocation,
+      rateLimitReqPerMin: 1500,
+      totalRequests: 0,
+    };
+
+    setApiKeys(prev => [newApiKey, ...prev]);
+    addAuditLog('System Configuration', 'None', `Client ${client?.companyName || clientId} generated API key: ${newApiKey.name}`, newApiKey.id);
+    return { key: fullKey, apiKeyObj: newApiKey };
+  };
+
+  const revokeApiKey = (keyId: string) => {
+    setApiKeys(prev =>
+      prev.map(k => {
+        if (k.id === keyId) {
+          addAuditLog('System Configuration', `API Key Status: ${k.status}`, 'API Key Status: Revoked', k.id);
+          return { ...k, status: 'Revoked' };
+        }
+        return k;
+      })
+    );
+  };
+
+  const connectProviderApi = (providerId: string, endpoint: string, secretKey: string) => {
+    const masked = secretKey.length > 8 ? `${secretKey.substring(0, 6)}••••••••${secretKey.slice(-4)}` : '••••••••';
+    setProviders(prev =>
+      prev.map(p => {
+        if (p.id === providerId) {
+          return {
+            ...p,
+            apiEndpoint: endpoint,
+            upstreamKeyMasked: masked,
+            apiStatus: 'Operational',
+            lastHeartbeat: new Date().toISOString().replace('T', ' ').substring(0, 16) + ' UTC',
+          };
+        }
+        return p;
+      })
+    );
+    addAuditLog('Provider Changes', 'Upstream Key Updated', `Connected Upstream Provider API Endpoint: ${endpoint}`, providerId);
+  };
+
+  const updateProviderCapacity = (providerId: string, updates: Partial<Provider>) => {
+    setProviders(prev =>
+      prev.map(p => {
+        if (p.id === providerId) {
+          const purchased = updates.purchasedGpuCount !== undefined ? updates.purchasedGpuCount : p.purchasedGpuCount;
+          const allocated = updates.allocatedResourcesCount !== undefined ? updates.allocatedResourcesCount : p.allocatedResourcesCount;
+          const running = updates.runningGpuCount !== undefined ? updates.runningGpuCount : p.runningGpuCount;
+          const available = Math.max(0, purchased - allocated);
+          return {
+            ...p,
+            ...updates,
+            purchasedGpuCount: purchased,
+            allocatedResourcesCount: allocated,
+            runningGpuCount: running,
+            availableGpuCount: available,
+          };
+        }
+        return p;
+      })
+    );
+  };
+
+  const clearAllMockData = () => {
+    setGpus([]);
+    setDids([]);
+    setClients([]);
+    setPendingRequests([]);
+    setInvoices([]);
+    setPayments([]);
+    setAlerts([]);
+    setApiKeys([]);
+    setAuditLogs(prev => [
+      {
+        id: `audit-${Date.now()}`,
+        user: currentUser.name,
+        role: currentUser.role,
+        action: 'System Configuration',
+        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16) + ' UTC',
+        ipAddress: '127.0.0.1 (Local)',
+        oldValue: 'Mock Demo Data Active',
+        newValue: 'Clean Production Slate (All demo records cleared)',
+      },
+      ...prev,
+    ]);
+  };
+
+  const restoreDemoData = () => {
+    setGpus(INITIAL_GPU_INVENTORY);
+    setSipProviders(INITIAL_SIP_PROVIDERS);
+    setDids(INITIAL_DID_NUMBERS);
+    setClients(INITIAL_CLIENTS);
+    setPendingRequests(INITIAL_PENDING_REQUESTS);
+    setProviders(INITIAL_PROVIDERS);
+    setInvoices(INITIAL_INVOICES);
+    setPayments(INITIAL_PAYMENTS);
+    setAlerts(INITIAL_ALERTS);
+    setApiKeys(INITIAL_API_KEYS);
+    setAuditLogs(prev => [
+      {
+        id: `audit-${Date.now()}`,
+        user: currentUser.name,
+        role: currentUser.role,
+        action: 'System Configuration',
+        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16) + ' UTC',
+        ipAddress: '127.0.0.1 (Local)',
+        oldValue: 'Clean Production Slate',
+        newValue: 'Restored Sample Demo Records',
+      },
+      ...prev,
+    ]);
+  };
+
+
+
   const simulateTrunkAlert = (type: 'sip_down' | 'poor_quality' | 'failed_provision') => {
     if (type === 'sip_down') {
       createAlert({
@@ -1164,6 +1308,11 @@ Please save and bookmark your dedicated URL for instant access.
         alerts,
         auditLogs,
         supportTickets,
+        apiKeys,
+        createApiKey,
+        revokeApiKey,
+        connectProviderApi,
+        updateProviderCapacity,
         allocateGpu,
         reclaimGpu,
         transferGpu,
@@ -1205,6 +1354,8 @@ Please save and bookmark your dedicated URL for instant access.
         clientLogout,
         setAuthenticatedClient,
         updateClientCredentials,
+        clearAllMockData,
+        restoreDemoData,
         isClientPortalMode,
         setIsClientPortalMode,
         targetClientIdFromUrl,

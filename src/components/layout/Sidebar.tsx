@@ -14,6 +14,7 @@ import {
   UserCircle2,
   GitPullRequest,
   Lock,
+  Terminal,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -30,7 +31,7 @@ export const Sidebar: React.FC = () => {
     { id: 'gpus', label: 'GPU Clusters', icon: Server },
     { id: 'sips', label: 'DID & SIP Trunks', icon: PhoneCall },
     { id: 'clients', label: 'Clients & Accounts', icon: Users },
-    { id: 'providers', label: 'Wholesale Providers', icon: Building2 },
+    { id: 'providers', label: 'GPU Providers', icon: Building2 },
     { id: 'invoices', label: 'Invoices & Billing', icon: Receipt },
     { id: 'finance', label: 'Profitability & Finance', icon: TrendingUp },
   ];
@@ -41,6 +42,7 @@ export const Sidebar: React.FC = () => {
     { id: 'users', label: 'Users & Passwords', icon: Lock },
     { id: 'bonus-tools', label: 'Calculators & Forecast', icon: Sparkles },
     { id: 'database', label: 'SQL Schema & Queries', icon: Database },
+    { id: 'xampp', label: 'Local Run & Netlify Guide', icon: Terminal },
   ];
 
   const handleNavClick = (id: string) => {

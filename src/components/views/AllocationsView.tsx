@@ -68,9 +68,7 @@ export const AllocationsView: React.FC = () => {
             <GitPullRequest className="w-4 h-4 text-cyan-500" />
             Wholesale Resource Allocation &amp; Approval Desk
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Enforces strict role-based governance on GPU cluster leasing and carrier voice trunks.
-          </p>
+         
         </div>
         <button
           onClick={() => setShowRequestModal(true)}
@@ -83,10 +81,10 @@ export const AllocationsView: React.FC = () => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <MetricCard label="Pending Approval" value={pendingCount} subValue="Awaiting review" highlight badge="Urgent" />
-        <MetricCard label="On Hold" value={holdCount} subValue="Credit / KYC verification" badge="Hold" />
-        <MetricCard label="Approved (This Month)" value={approvedCount} subValue="Provisioning triggered" badge="Active" />
-        <MetricCard label="Workflow SLA" value="< 2.4 hrs" subValue="Average approval turnaround" badge="SLA" />
+        <MetricCard label="Pending Approval" value={pendingCount}  />
+        <MetricCard label="On Hold" value={holdCount} />
+        <MetricCard label="Approved (This Month)" value={approvedCount}  />
+        
       </div>
 
       {/* Sub-Tabs */}

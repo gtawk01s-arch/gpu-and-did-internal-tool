@@ -83,11 +83,8 @@ export const GpuManagementView: React.FC = () => {
         <div>
           <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <Cpu className="w-4 h-4 text-cyan-500" />
-            Wholesale GPU Inventory &amp; Cluster Fleet
+             GPU Inventory &amp; Cluster Fleet
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Track bulk compute nodes purchased from RunPod, Lambda Labs, CoreWeave, and Vast.ai.
-          </p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -102,11 +99,11 @@ export const GpuManagementView: React.FC = () => {
 
       {/* GPU Capacity KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <MetricCard label="Total Purchased" value={totalPurchased} subValue="Physical GPUs" badge="Capacity" />
-        <MetricCard label="Total Allocated" value={totalAllocated} subValue="Assigned to clients" badge="Committed" />
-        <MetricCard label="Available" value={totalAvailable} subValue="Ready to spin up" highlight badge="Free" />
-        <MetricCard label="In Use (Online)" value={inUseCount} subValue="Workloads running" badge="Active" />
-        <MetricCard label="Reserved" value={reservedCount} subValue="Contract pending" badge="Holding" />
+        <MetricCard label="Total Purchased" value={totalPurchased}  />
+        <MetricCard label="Total Allocated" value={totalAllocated}  />
+        <MetricCard label="Available" value={totalAvailable}  />
+        <MetricCard label="In Use (Online)" value={inUseCount} />
+        <MetricCard label="Reserved" value={reservedCount}  />
       </div>
 
       {/* Filters & Search Bar */}

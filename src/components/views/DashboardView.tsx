@@ -48,10 +48,28 @@ export const DashboardView: React.FC = () => {
   const allocatedDids = dids.filter(d => d.status === 'Assigned').length;
   const availableDids = dids.filter(d => d.status === 'Available').length;
 
-  const monthlyRevenue = clients.reduce((sum, c) => sum + c.monthlySpend, 0);
-  const monthlyCost = clients.reduce((sum, c) => sum + c.monthlyCost, 0);
-  const grossProfit = monthlyRevenue - monthlyCost;
-  const netProfit = Math.round(grossProfit * 0.88); // Net after datacenter cross-connects & ops overhead
+  // Separate GPU vs DID vs Total Profitability calculations
+  const gpuRevenue = gpus.reduce((sum, g) => sum + (g.sellingPrice * g.allocatedQuantity), 0);
+  const gpuCost = gpus.reduce((sum, g) => sum + (g.monthlyCost * g.allocatedQuantity), 0);
+  const gpuProfit = gpuRevenue - gpuCost;
+  const gpuMargin = gpuRevenue > 0 ? ((gpuProfit / gpuRevenue) * 100).toFixed(1) : '0';
+
+  const assignedDids = dids.filter(d => d.status === 'Assigned');
+  const didNumbersCost = assignedDids.reduce((sum, d) => sum + d.monthlyCost, 0);
+  const didNumbersRevenue = assignedDids.reduce((sum, d) => sum + d.sellingPrice, 0);
+  const sipTrunksCost = sipProviders.reduce((sum, p) => sum + p.monthlyCost, 0);
+  const sipTrunksRevenue = Math.round(sipTrunksCost * 1.55);
+
+  const didRevenue = didNumbersRevenue + sipTrunksRevenue;
+  const didCost = didNumbersCost + sipTrunksCost;
+  const didProfit = didRevenue - didCost;
+  const didMargin = didRevenue > 0 ? ((didProfit / didRevenue) * 100).toFixed(1) : '0';
+
+  const monthlyRevenue = gpuRevenue + didRevenue;
+  const monthlyCost = gpuCost + didCost;
+  const grossProfit = gpuProfit + didProfit;
+  const netProfit = Math.round(grossProfit * 0.90);
+  const combinedMargin = monthlyRevenue > 0 ? ((grossProfit / monthlyRevenue) * 100).toFixed(1) : '0';
 
   const activeClientsCount = clients.filter(c => c.status === 'Active').length;
   const outstandingInvoicesTotal = invoices
@@ -105,11 +123,9 @@ export const DashboardView: React.FC = () => {
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
-              Wholesale Revenue &amp; Financial Overview
+               Revenue &amp; Financial Overview
             </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Monthly consolidated figures across RunPod, Lambda, Vast.ai, Telnyx, Bandwidth &amp; Twilio.
-            </p>
+            
           </div>
           <div className="flex items-center gap-2 text-xs">
             <span className="text-slate-500 dark:text-slate-400 font-mono">Real-time Margin:</span>
@@ -121,33 +137,30 @@ export const DashboardView: React.FC = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
           <MetricCard
+            label="GPU Compute Profit"
+            value={`+${formatINR(gpuProfit)}`}
+            icon={Server}
+            highlight
+          
+          />
+          <MetricCard
+            label="DID Telecom Profit"
+            value={`+${formatINR(didProfit)}`}
+            icon={PhoneCall}
+            
+          />
+          <MetricCard
+            label="Total Combined Profit"
+            value={`+${formatINR(grossProfit)}`}
+            
+            icon={TrendingUp}
+            
+          />
+          <MetricCard
             label="Monthly Resale Revenue"
             value={formatINR(monthlyRevenue)}
-            subValue="Run-rate billing"
-            trend={{ direction: 'up', value: '+14.2% YoY' }}
+           
             icon={IndianRupee}
-            highlight
-          />
-          <MetricCard
-            label="Wholesale Provider Cost"
-            value={formatINR(monthlyCost)}
-            subValue="Commitments & usage"
-            trend={{ direction: 'neutral', value: '64.9% of Rev' }}
-            icon={Layers}
-          />
-          <MetricCard
-            label="Gross Wholesale Profit"
-            value={formatINR(grossProfit)}
-            subValue="Spread arbitrage"
-            trend={{ direction: 'up', value: '+₹2.4L vs Q2' }}
-            icon={TrendingUp}
-          />
-          <MetricCard
-            label="Net Operating Profit"
-            value={formatINR(netProfit)}
-            subValue="After carrier cross-connects"
-            trend={{ direction: 'up', value: '28.9% Net Margin' }}
-            icon={ArrowUpRight}
           />
         </div>
       </div>
@@ -157,42 +170,41 @@ export const DashboardView: React.FC = () => {
         <MetricCard
           label="Total Purchased GPUs"
           value={totalGpuPurchased}
-          subValue={`${gpus.length} node pools`}
+          
           icon={Server}
-          badge="Nodes"
+         
         />
         <MetricCard
           label="Allocated GPUs"
           value={totalGpuAllocated}
-          subValue={`${totalGpuActive} active in use`}
-          trend={{ direction: 'up', value: `${gpuUtilPercent}% Utilized` }}
-          badge="Allocated"
+          
+          
         />
         <MetricCard
           label="Free GPU Inventory"
           value={totalGpuFree}
-          subValue="Available to assign"
-          badge="Surplus"
+          
+          
         />
         <MetricCard
           label="Total DID Inventory"
           value={totalDids}
-          subValue="E.164 phone blocks"
+         
           icon={PhoneCall}
-          badge="DIDs"
+          
         />
         <MetricCard
           label="Available DIDs"
           value={availableDids}
-          subValue={`${allocatedDids} assigned`}
-          badge="Telecom"
+         
+          
         />
         <MetricCard
           label="Active Clients"
           value={activeClientsCount}
-          subValue={`${formatINR(outstandingInvoicesTotal)} unpaid`}
+          
           icon={Users}
-          badge="Clients"
+          
         />
       </div>
 
@@ -205,9 +217,6 @@ export const DashboardView: React.FC = () => {
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
                 Revenue vs Provider Cost vs Profit Trend (12 Months)
               </h3>
-              <p className="text-[11px] text-slate-400">
-                Historical trajectory of gross wholesale spread and commitments.
-              </p>
             </div>
             <div className="flex items-center gap-1.5 p-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[11px]">
               {(['30D', '90D', '1Y'] as const).map(tab => (
@@ -433,7 +442,7 @@ export const DashboardView: React.FC = () => {
               <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 font-medium">
                 <th className="py-2 px-3">Request ID</th>
                 <th className="py-2 px-3">Client Name</th>
-                <th className="py-2 px-3">Resource Type &amp; Specs</th>
+                <th className="py-2 px-3">Resource Type</th>
                 <th className="py-2 px-3 text-right">Quantity</th>
                 <th className="py-2 px-3 text-right">Monthly Value</th>
                 <th className="py-2 px-3">Date</th>

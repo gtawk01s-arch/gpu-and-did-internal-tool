@@ -124,7 +124,7 @@ export type ResourceType = 'GPU Cluster' | 'DID / SIP Trunk';
 export interface Provider {
   id: string;
   name: string;
-  providerType: 'GPU Cloud Provider' | 'Tier-1 Telecom' | 'Bare-Metal Datacenter';
+  providerType: 'GPU Cloud Provider' | 'Bare-Metal Datacenter' | 'Specialized AI Cloud';
   serviceType: string;
   contractStart: string;
   contractEnd: string;
@@ -132,15 +132,34 @@ export interface Provider {
   apiStatus: 'Operational' | 'Degraded' | 'Offline';
   uptime90d: number;
   apiLatencyMs: number;
-  allocatedResourcesCount: number;
   contactEmail: string;
-  // Specific capacity and contract metrics
-  purchasedGpuCount?: number;
-  purchasedGpuModel?: string;
-  purchasedDidCount?: number;
-  trunkChannels?: number;
+  // Celerko Provider API Connector
+  apiEndpoint?: string;
+  upstreamKeyMasked?: string;
+  // Celerko Capacity Manager
+  purchasedGpuCount: number;
+  allocatedResourcesCount: number;
+  runningGpuCount: number;
+  availableGpuCount: number;
+  purchasedGpuModel: string;
   lastHeartbeat?: string;
 }
+
+export interface CelerkoApiKey {
+  id: string;
+  clientId: string;
+  clientName: string;
+  name: string;
+  keyPrefix: string;
+  keyMasked: string;
+  createdAt: string;
+  lastUsed: string;
+  status: 'Active' | 'Revoked';
+  hasActiveGpuAllocation: boolean;
+  rateLimitReqPerMin: number;
+  totalRequests: number;
+}
+
 
 export type InvoiceStatus =
   | 'Draft'

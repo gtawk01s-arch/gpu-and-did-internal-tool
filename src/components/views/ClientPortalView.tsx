@@ -42,6 +42,9 @@ export const ClientPortalView: React.FC = () => {
     dids,
     invoices,
     pendingRequests,
+    apiKeys,
+    createApiKey,
+    revokeApiKey,
     createRequest,
     approveRequest,
     uploadPaymentProof,
@@ -985,16 +988,16 @@ export const ClientPortalView: React.FC = () => {
             </div>
           </div>
 
-          {/* Section B: API Keys for Dialko & Compute Integrations */}
+          {/* Section B: Celerko API Keys & Compute Access */}
           <div className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
               <div>
                 <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-1.5">
-                  <KeyRound className="w-4 h-4 text-indigo-500" />
-                  <span>API Keys &amp; Dialko Agent Integration Tokens</span>
+                  <KeyRound className="w-4 h-4 text-cyan-500" />
+                  <span>Celerko API Keys &amp; Programmatic Compute Access</span>
                 </h3>
                 <p className="text-slate-500 text-xs">
-                  Authenticate programmatic requests to allocate GPUs, manage SIP call trunks, or route through Dialko voice agents.
+                  Generate and revoke authenticated API keys to access Celerko endpoints and route requests to your allocated GPU cluster.
                 </p>
               </div>
               <button
@@ -1003,69 +1006,137 @@ export const ClientPortalView: React.FC = () => {
                   setCreatedKeySecret(null);
                   setShowCreateKeyModal(true);
                 }}
-                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 self-start sm:self-auto shadow-xs transition-colors"
+                className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 self-start sm:self-auto shadow-xs transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>+ Generate API Key</span>
+                <span>+ Create Celerko API Key</span>
               </button>
             </div>
 
+            {/* Crucial Architectural Distinction Callout */}
+            <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs space-y-1.5">
+              <div className="font-bold text-amber-900 dark:text-amber-200 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span>Important Distinction: API Keys vs. GPU Allocation</span>
+              </div>
+              <p className="text-amber-800 dark:text-amber-300 text-[11px] leading-relaxed">
+                An API key provides authenticated access to your Celerko account and proxy endpoints, but <strong>does not automatically allocate a GPU</strong>. To execute compute tasks, your account must have an active GPU allocation approved by the Admin Desk. (Current Allocation: <strong className="font-mono">{client.allocatedGpuCount} Active GPUs</strong>).
+              </p>
+            </div>
+
+            {/* Provider Key Confidentiality Banner */}
+            <div className="p-3 bg-slate-900 text-slate-200 rounded-lg border border-slate-800 flex items-center justify-between gap-3 text-xs font-mono">
+              <div className="flex items-center gap-2">
+                <Lock className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span className="text-[11px] text-slate-300">
+                  Provider Key Security: Upstream GPU provider secret keys (CoreWeave/Lambda/RunPod) are securely kept on backend and never exposed.
+                </span>
+              </div>
+              <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800 shrink-0">
+                100% Protected
+              </span>
+            </div>
+
+            {/* API Keys Table */}
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-400 font-medium">
                     <th className="py-2.5 px-3">Token Name</th>
                     <th className="py-2.5 px-3">Key Preview</th>
-                    <th className="py-2.5 px-3">Created Date</th>
-                    <th className="py-2.5 px-3">Last Activity</th>
+                    <th className="py-2.5 px-3">Allocation Status</th>
+                    <th className="py-2.5 px-3">Rate Limit</th>
+                    <th className="py-2.5 px-3">Total Requests</th>
                     <th className="py-2.5 px-3">Status</th>
                     <th className="py-2.5 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-sans">
-                  {clientApiKeys.map(k => (
-                    <tr key={k.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                      <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-slate-100">
-                        {k.name}
-                      </td>
-                      <td className="py-2.5 px-3 font-mono text-[11px] text-cyan-600 dark:text-cyan-400">
-                        {k.key.substring(0, 12)}••••••••
-                      </td>
-                      <td className="py-2.5 px-3 font-mono text-slate-500 text-[11px]">
-                        {k.createdAt}
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-500 text-[11px]">
-                        {k.lastUsed}
-                      </td>
-                      <td className="py-2.5 px-3">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                          k.status === 'Active'
-                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                            : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
-                        }`}>
-                          {k.status}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 text-right">
-                        {k.status === 'Active' ? (
-                          <button
-                            onClick={() => {
-                              setClientApiKeys(prev =>
-                                prev.map(item => item.id === k.id ? { ...item, status: 'Revoked' } : item)
-                              );
-                            }}
-                            className="text-rose-500 hover:text-rose-600 text-[11px] font-medium"
-                          >
-                            Revoke
-                          </button>
-                        ) : (
-                          <span className="text-slate-400 italic text-[11px]">Revoked</span>
-                        )}
+                  {apiKeys.filter(k => k.clientId === client.id).length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-6 text-center text-slate-400">
+                        No API keys generated yet. Click "+ Create Celerko API Key" above.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    apiKeys.filter(k => k.clientId === client.id).map(k => (
+                      <tr key={k.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                        <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-slate-100">
+                          {k.name}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono text-[11px] text-cyan-600 dark:text-cyan-400">
+                          {k.keyMasked || `${k.keyPrefix}••••••••`}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          {client.allocatedGpuCount > 0 ? (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                              ✓ {client.allocatedGpuCount}x GPU Active
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                              ⚠️ No Active Allocation
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono text-slate-500 text-[11px]">
+                          {k.rateLimitReqPerMin || 1500} rpm
+                        </td>
+                        <td className="py-2.5 px-3 font-mono text-slate-500 text-[11px]">
+                          {(k.totalRequests || 0).toLocaleString()}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                            k.status === 'Active'
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                              : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                          }`}>
+                            {k.status}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          {k.status === 'Active' ? (
+                            <button
+                              onClick={() => revokeApiKey(k.id)}
+                              className="text-rose-500 hover:text-rose-600 text-[11px] font-medium"
+                            >
+                              Revoke
+                            </button>
+                          ) : (
+                            <span className="text-slate-400 italic text-[11px]">Revoked</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Client Access: Endpoints & Curl Guide */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-3 text-xs">
+              <h4 className="font-bold text-slate-800 dark:text-slate-200 text-xs flex items-center gap-1.5 font-sans">
+                <Server className="w-3.5 h-3.5 text-cyan-500" />
+                <span>Your Authenticated Client Endpoints &amp; cURL Quickstart</span>
+              </h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 font-mono text-[11px]">
+                <div className="p-2.5 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                  <span className="text-slate-400 font-sans block text-[10px]">Celerko API Proxy Gateway:</span>
+                  <span className="font-bold text-cyan-600 dark:text-cyan-400">https://api.celerko.cloud/v1</span>
+                </div>
+                <div className="p-2.5 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                  <span className="text-slate-400 font-sans block text-[10px]">Client Ingress Cluster:</span>
+                  <span className="font-bold text-indigo-600 dark:text-indigo-400">https://node-{client.id}.celerko.cloud:8443</span>
+                </div>
+              </div>
+
+              <div className="p-3 bg-slate-950 text-slate-300 rounded-lg font-mono text-[11px] overflow-x-auto space-y-1">
+                <div className="text-slate-500 font-sans text-[10px] pb-1">Sample Authentication Header (cURL):</div>
+                <div className="text-cyan-400">curl -X POST https://api.celerko.cloud/v1/chat/completions \</div>
+                <div className="text-emerald-400">  -H "Authorization: Bearer ck_live_your_key_here" \</div>
+                <div className="text-slate-300">  -H "Content-Type: application/json" \</div>
+                <div className="text-amber-300">  -d '{`{"model": "meta-llama/Llama-3-70b-instruct", "messages": [{"role": "user", "content": "Hello Celerko!"}]}`}'</div>
+              </div>
             </div>
           </div>
         </div>
@@ -1609,17 +1680,8 @@ export const ClientPortalView: React.FC = () => {
                 onSubmit={e => {
                   e.preventDefault();
                   if (!newKeyName.trim()) return;
-                  const keySecret = `ck_live_${Math.random().toString(36).substring(2)}${Date.now().toString(36)}`;
-                  const newEntry = {
-                    id: `key-${Date.now()}`,
-                    name: newKeyName.trim(),
-                    key: keySecret,
-                    createdAt: new Date().toISOString().split('T')[0],
-                    lastUsed: 'Never',
-                    status: 'Active' as const,
-                  };
-                  setClientApiKeys(prev => [newEntry, ...prev]);
-                  setCreatedKeySecret(keySecret);
+                  const res = createApiKey(client.id, newKeyName.trim());
+                  setCreatedKeySecret(res.key);
                 }}
                 className="space-y-3 text-xs"
               >
@@ -1634,8 +1696,13 @@ export const ClientPortalView: React.FC = () => {
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100"
                   />
                 </div>
-                <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded border border-slate-200 dark:border-slate-700/60 text-[11px] text-slate-500">
-                  This key will have authorized tenant permissions strictly scoped to <strong>{client.companyName}</strong>. Cross-organization access is prohibited by backend tenant isolation.
+                <div className="p-3 bg-amber-50 dark:bg-amber-950/40 rounded-lg border border-amber-200 dark:border-amber-800/60 text-[11px] text-amber-900 dark:text-amber-200 space-y-1">
+                  <strong>Reminder:</strong> Creating this key authenticates your requests. To execute GPU workloads, an active GPU allocation must be approved by the Admin.
+                  {client.allocatedGpuCount > 0 ? (
+                    <span className="block text-emerald-600 dark:text-emerald-400 font-semibold mt-1">✓ Your account has {client.allocatedGpuCount} Active GPUs allocated.</span>
+                  ) : (
+                    <span className="block text-amber-700 dark:text-amber-300 font-semibold mt-1">⚠️ You currently have 0 GPUs allocated. Submit a request in the Requests tab.</span>
+                  )}
                 </div>
                 <div className="flex justify-end gap-2 pt-2">
                   <button

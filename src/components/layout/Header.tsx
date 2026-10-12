@@ -11,6 +11,13 @@ import {
   LogOut,
   KeyRound,
   ShieldCheck,
+  Database,
+  Trash2,
+  RefreshCcw,
+  Sparkles,
+  Code2,
+  X,
+  FileCode,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { UserRole } from '../../types';
@@ -32,11 +39,20 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCommandPalette }) => {
     clientLogout,
     isClientPortalMode,
     setIsClientPortalMode,
+    clients,
+    gpus,
+    invoices,
+    apiKeys,
+    clearAllMockData,
+    restoreDemoData,
   } = useApp();
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [showAlertMenu, setShowAlertMenu] = useState(false);
+  const [showDataModal, setShowDataModal] = useState(false);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   const activeAlerts = alerts.filter(a => !a.resolved);
+  const isMockActive = clients.length > 0 || gpus.length > 0;
 
   const roles: UserRole[] = [
     'Super Admin',
@@ -47,20 +63,30 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCommandPalette }) => {
     'Client Portal User',
   ];
 
+  const handleClearMockData = () => {
+    clearAllMockData();
+    setActionNotice('All sample mock data has been cleared! You now have a clean production slate with zero demo records.');
+    setTimeout(() => setActionNotice(null), 5000);
+  };
+
+  const handleRestoreDemoData = () => {
+    restoreDemoData();
+    setActionNotice('Sample demo mock data has been re-populated across all GPU, Client, and Invoice modules.');
+    setTimeout(() => setActionNotice(null), 5000);
+  };
+
   return (
     <header className="h-14 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-0 z-30 px-4 lg:px-6 flex items-center justify-between gap-4 transition-colors">
       {/* Brand */}
       <div className="flex items-center gap-2.5 shrink-0">
         <div className="w-7 h-7 rounded-md bg-gradient-to-tr from-cyan-600 to-blue-600 flex items-center justify-center text-white font-bold text-xs tracking-wider shadow-xs">
-          AX
+          CK
         </div>
         <div>
           <span className="text-sm font-bold text-slate-900 dark:text-slate-100 block leading-tight">
-            GPU &amp; DID Wholesale Management
+            Celerko GPU &amp; DID Management
           </span>
-          <span className="text-[10px] text-slate-400 font-mono block">
-            Tata · Airtel · Jio · E2E Cloud (INR ₹)
-          </span>
+          
         </div>
       </div>
 
@@ -115,7 +141,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCommandPalette }) => {
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-2.5 shrink-0">
+      <div className="flex items-center gap-2 shrink-0">
+        
+
         {/* Alerts Bell */}
         <div className="relative">
           <button
@@ -159,38 +187,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCommandPalette }) => {
           )}
         </div>
 
-        {/* Client Portal Quick Button or Active Session Indicator */}
-        {authenticatedClient ? (
-          <div className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-800 rounded-lg px-2.5 py-1 text-xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <button
-              onClick={() => setActiveTab('client-portal')}
-              className="font-bold text-emerald-800 dark:text-emerald-300 hover:underline max-w-[140px] truncate"
-              title={`Logged in as ${authenticatedClient.companyName}`}
-            >
-              {authenticatedClient.companyName}
-            </button>
-            <button
-              onClick={clientLogout}
-              className="text-slate-400 hover:text-rose-500 ml-1 p-0.5"
-              title="Sign Out of Client Portal"
-            >
-              <LogOut className="w-3 h-3" />
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => {
-              setIsClientPortalMode(true);
-              setActiveTab('client-portal');
-            }}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-cyan-700 dark:text-cyan-300 bg-cyan-50 dark:bg-cyan-950/40 hover:bg-cyan-100 dark:hover:bg-cyan-900/60 border border-cyan-200 dark:border-cyan-800 rounded-lg transition-colors"
-            title="Open Dedicated Client Portal"
-          >
-            <KeyRound className="w-3.5 h-3.5 text-cyan-500" />
-            <span className="hidden sm:inline">Client Portal</span>
-          </button>
-        )}
+      
 
         {/* Theme Toggle */}
         <button
@@ -237,6 +234,122 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCommandPalette }) => {
           )}
         </div>
       </div>
+
+      {/* Mock Data Source Management Modal */}
+      {showDataModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-6 space-y-4 text-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <Database className="w-4 h-4 text-cyan-500" />
+                <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                  Data Source &amp; Mock Data Management
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowDataModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {actionNotice && (
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 rounded-xl text-emerald-800 dark:text-emerald-200 text-xs font-semibold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{actionNotice}</span>
+              </div>
+            )}
+
+            {/* Current State Summary */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700/80 space-y-2">
+              <div className="font-bold text-slate-800 dark:text-slate-200 text-xs">
+                Current In-Memory Database State:
+              </div>
+              <div className="grid grid-cols-4 gap-2 font-mono text-center">
+                <div className="p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                  <div className="text-[10px] text-slate-400 font-sans">Clients</div>
+                  <div className="font-bold text-slate-900 dark:text-slate-100">{clients.length}</div>
+                </div>
+                <div className="p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                  <div className="text-[10px] text-slate-400 font-sans">GPU Pools</div>
+                  <div className="font-bold text-cyan-500">{gpus.length}</div>
+                </div>
+                <div className="p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                  <div className="text-[10px] text-slate-400 font-sans">Invoices</div>
+                  <div className="font-bold text-slate-900 dark:text-slate-100">{invoices.length}</div>
+                </div>
+                <div className="p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                  <div className="text-[10px] text-slate-400 font-sans">API Keys</div>
+                  <div className="font-bold text-indigo-500">{apiKeys.length}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Instant UI Action Buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="p-4 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/50 dark:bg-rose-950/20 space-y-2">
+                <div className="font-bold text-rose-800 dark:text-rose-300 flex items-center gap-1.5">
+                  <Trash2 className="w-4 h-4 text-rose-500" />
+                  <span>Clear All Mock Data</span>
+                </div>
+                <p className="text-[11px] text-rose-700 dark:text-rose-400 leading-relaxed">
+                  Wipes all demo clients, GPU nodes, invoices, and sample records. Gives you an empty canvas ready for real production entry.
+                </p>
+                <button
+                  onClick={handleClearMockData}
+                  className="w-full py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg transition-colors shadow-xs"
+                >
+                  Clear All Demo Records
+                </button>
+              </div>
+
+              <div className="p-4 rounded-xl border border-cyan-200 dark:border-cyan-900/60 bg-cyan-50/50 dark:bg-cyan-950/20 space-y-2">
+                <div className="font-bold text-cyan-800 dark:text-cyan-300 flex items-center gap-1.5">
+                  <RefreshCcw className="w-4 h-4 text-cyan-500" />
+                  <span>Restore Sample Data</span>
+                </div>
+                <p className="text-[11px] text-cyan-700 dark:text-cyan-400 leading-relaxed">
+                  Re-populates the complete demo dataset with Indian wholesale clients, GPU clusters, and sample invoices.
+                </p>
+                <button
+                  onClick={handleRestoreDemoData}
+                  className="w-full py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg transition-colors shadow-xs"
+                >
+                  Restore Sample Dataset
+                </button>
+              </div>
+            </div>
+
+            {/* Permanent Code Explanation */}
+            <div className="p-3 bg-slate-100 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700 text-[11px] space-y-1.5 text-slate-600 dark:text-slate-300">
+              <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                <Code2 className="w-3.5 h-3.5 text-cyan-500" />
+                <span>How to remove mock data permanently in source code:</span>
+              </div>
+              <p>
+                In <strong className="font-mono text-cyan-600 dark:text-cyan-400">src/context/AppContext.tsx</strong>, the state arrays are initialized from <strong className="font-mono">INITIAL_GPU_INVENTORY</strong>, <strong className="font-mono">INITIAL_CLIENTS</strong>, etc.
+              </p>
+              <div className="p-2 bg-slate-950 text-slate-300 rounded font-mono text-[10px] space-y-0.5">
+                <span className="text-slate-500">// Change in src/context/AppContext.tsx:</span>
+                <div className="text-rose-400">- const [gpus, setGpus] = useState(INITIAL_GPU_INVENTORY);</div>
+                <div className="text-emerald-400">+ const [gpus, setGpus] = useState([]);</div>
+                <div className="text-rose-400">- const [clients, setClients] = useState(INITIAL_CLIENTS);</div>
+                <div className="text-emerald-400">+ const [clients, setClients] = useState([]);</div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={() => setShowDataModal(false)}
+                className="px-4 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-lg text-xs"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 };

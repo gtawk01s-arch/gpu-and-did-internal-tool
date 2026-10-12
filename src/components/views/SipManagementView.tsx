@@ -171,11 +171,9 @@ export const SipManagementView: React.FC = () => {
         <div>
           <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <PhoneCall className="w-4 h-4 text-indigo-500" />
-            Wholesale SIP Trunks &amp; DID Telecom Management
+             SIP Trunks &amp; DID Telecom Management
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Carrier trunks, wholesale DID inventory, import lists, and automated client allocations.
-          </p>
+          
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button
@@ -204,11 +202,11 @@ export const SipManagementView: React.FC = () => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <MetricCard label="Total SIP Trunks" value={totalSipTrunks} subValue={`${totalChannels.toLocaleString()} Total CPS`} badge="Carriers" />
-        <MetricCard label="Total DID Pool" value={totalDids} subValue="E.164 Inventory" badge="DIDs" />
-        <MetricCard label="Assigned DIDs" value={assignedDids} subValue="Active in production" highlight badge="Assigned" />
-        <MetricCard label="Available DIDs" value={availableDids} subValue="Ready to allocate" badge="Available" />
-        <MetricCard label="Suspended DIDs" value={suspendedDids} subValue="Account flag / freeze" badge="Hold" />
+        <MetricCard label="Total SIP Trunks" value={totalSipTrunks}  badge="Carriers" />
+        <MetricCard label="Total DID Pool" value={totalDids} />
+        <MetricCard label="Assigned DIDs" value={assignedDids}  />
+        <MetricCard label="Available DIDs" value={availableDids}  />
+        <MetricCard label="Suspended DIDs" value={suspendedDids}  />
       </div>
 
       {/* Section 1: SIP Carrier Trunks Overview */}

@@ -12,10 +12,15 @@ import {
   FolderArchive,
   Layers,
   ArrowRight,
+  Globe,
+  Cloud,
+  KeyRound,
+  ShieldCheck,
+  Code2,
 } from 'lucide-react';
 
 export const XamppGuideView: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'instructions' | 'sql' | 'db_php' | 'api_php' | 'standalone_html'>('instructions');
+  const [activeTab, setActiveTab] = useState<'local' | 'netlify' | 'sql' | 'backend_proxy' | 'html_css'>('local');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const handleCopy = (key: string, code: string) => {
@@ -36,323 +41,403 @@ export const XamppGuideView: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  const MYSQL_SCHEMA_SQL = `-- =======================================================
--- XAMPP / MySQL / MariaDB Schema for GPU & SIP System
--- Import this in phpMyAdmin: http://localhost/phpmyadmin
--- =======================================================
+  const NETLIFY_TOML_CONTENT = `# netlify.toml - Production Netlify Configuration
+[build]
+  command = "npm run build"
+  publish = "dist"
 
-CREATE DATABASE IF NOT EXISTS \`gpu_sip_broker\` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE \`gpu_sip_broker\`;
+[build.environment]
+  NODE_VERSION = "22"
 
--- 1. Clients Table (Dedicated portal credentials)
-CREATE TABLE IF NOT EXISTS \`clients\` (
-  \`id\` INT AUTO_INCREMENT PRIMARY KEY,
-  \`company_name\` VARCHAR(150) NOT NULL,
-  \`contact_person\` VARCHAR(100) NOT NULL,
-  \`email\` VARCHAR(120) NOT NULL,
-  \`portal_username\` VARCHAR(120) NOT NULL,
-  \`portal_password\` VARCHAR(120) NOT NULL,
-  \`phone\` VARCHAR(40),
-  \`address\` TEXT,
-  \`resource_need\` ENUM('GPU Only', 'DID Only', 'Both GPU & DID') NOT NULL DEFAULT 'Both GPU & DID',
-  \`gpu_needed_model\` VARCHAR(100),
-  \`gpu_needed_qty\` INT DEFAULT 0,
-  \`did_needed_type\` VARCHAR(100),
-  \`did_needed_qty\` INT DEFAULT 0,
-  \`monthly_spend\` DECIMAL(12,2) DEFAULT 0.00,
-  \`monthly_cost\` DECIMAL(12,2) DEFAULT 0.00,
-  \`status\` VARCHAR(30) DEFAULT 'Active',
-  \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+# SPA Single-Page App Routing: Redirect all routes to index.html with 200 OK
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
 
--- 2. GPU Inventory Table
-CREATE TABLE IF NOT EXISTS \`gpu_nodes\` (
-  \`id\` INT AUTO_INCREMENT PRIMARY KEY,
-  \`gpu_id\` VARCHAR(50) UNIQUE NOT NULL,
-  \`provider\` VARCHAR(80) NOT NULL,
-  \`region\` VARCHAR(60) NOT NULL,
-  \`gpu_model\` VARCHAR(100) NOT NULL,
-  \`quantity\` INT NOT NULL DEFAULT 1,
-  \`allocated_quantity\` INT NOT NULL DEFAULT 0,
-  \`monthly_cost\` DECIMAL(10,2) NOT NULL,
-  \`selling_price\` DECIMAL(10,2) NOT NULL,
-  \`assigned_client_id\` INT NULL,
-  \`status\` ENUM('Available', 'In Use', 'Reserved', 'Maintenance') DEFAULT 'Available',
-  \`contract_start\` DATE,
-  \`contract_end\` DATE,
-  FOREIGN KEY (\`assigned_client_id\`) REFERENCES \`clients\`(\`id\`) ON DELETE SET NULL
-) ENGINE=InnoDB;
-
--- 3. DID Telecom Inventory Table
-CREATE TABLE IF NOT EXISTS \`did_numbers\` (
-  \`id\` INT AUTO_INCREMENT PRIMARY KEY,
-  \`did_number\` VARCHAR(40) UNIQUE NOT NULL,
-  \`provider\` VARCHAR(80) NOT NULL,
-  \`country\` VARCHAR(60) NOT NULL,
-  \`assigned_client_id\` INT NULL,
-  \`monthly_cost\` DECIMAL(8,2) NOT NULL,
-  \`selling_price\` DECIMAL(8,2) NOT NULL,
-  \`status\` ENUM('Available', 'Assigned', 'Suspended') DEFAULT 'Available',
-  \`usage_minutes\` INT DEFAULT 0,
-  FOREIGN KEY (\`assigned_client_id\`) REFERENCES \`clients\`(\`id\`) ON DELETE SET NULL
-) ENGINE=InnoDB;
-
--- 4. Resource Allocation & Client Requests Table
-CREATE TABLE IF NOT EXISTS \`resource_requests\` (
-  \`id\` INT AUTO_INCREMENT PRIMARY KEY,
-  \`request_code\` VARCHAR(50) UNIQUE NOT NULL,
-  \`client_id\` INT NOT NULL,
-  \`resource_type\` ENUM('GPU Cluster', 'SIP Trunk', 'DID Number Block') NOT NULL,
-  \`specs\` VARCHAR(255) NOT NULL,
-  \`quantity\` INT NOT NULL DEFAULT 1,
-  \`monthly_cost\` DECIMAL(10,2) NOT NULL,
-  \`selling_price\` DECIMAL(10,2) NOT NULL,
-  \`status\` ENUM('Pending', 'Approved', 'Rejected', 'Hold') DEFAULT 'Pending',
-  \`notes\` TEXT,
-  \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (\`client_id\`) REFERENCES \`clients\`(\`id\`) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
--- Sample Seed Data
-INSERT INTO \`clients\` (\`company_name\`, \`contact_person\`, \`email\`, \`phone\`, \`resource_need\`, \`gpu_needed_model\`, \`gpu_needed_qty\`, \`monthly_spend\`, \`monthly_cost\`) VALUES
-('HyperScale AI Inc.', 'Sarah Jenkins (CTO)', 'sjenkins@hyperscale.ai', '+1 415-555-0199', 'Both GPU & DID', 'NVIDIA H100 SXM5 80GB', 60, 204500.00, 137800.00),
-('AnthroTech Labs', 'Dr. Nikolai Weber', 'n.weber@anthrotech.de', '+49 30 555-8821', 'GPU Only', 'NVIDIA H100 SXM5 80GB', 32, 114200.00, 74600.00),
-('VoxFlow Voice Solutions', 'Marcus Brody', 'mbrody@voxflow.io', '+1 800-459-2099', 'DID Only', NULL, 0, 54800.00, 32400.00);
-
-INSERT INTO \`gpu_nodes\` (\`gpu_id\`, \`provider\`, \`region\`, \`gpu_model\`, \`quantity\`, \`allocated_quantity\`, \`monthly_cost\`, \`selling_price\`, \`assigned_client_id\`, \`status\`) VALUES
-('GPU-H100-US-E1', 'RunPod', 'us-east', 'NVIDIA H100 SXM5 80GB', 64, 60, 2150.00, 3200.00, 1, 'In Use'),
-('GPU-A100-US-W2', 'Lambda Labs', 'us-west', 'NVIDIA A100 SXM4 80GB', 48, 44, 1100.00, 1750.00, 2, 'In Use'),
-('GPU-L40S-US-C1', 'Vast.ai', 'us-central', 'NVIDIA L40S 48GB Ada', 64, 0, 620.00, 980.00, NULL, 'Available');
-
-INSERT INTO \`did_numbers\` (\`did_number\`, \`provider\`, \`country\`, \`assigned_client_id\`, \`monthly_cost\`, \`selling_price\`, \`status\`) VALUES
-('+1 (415) 890-4100', 'Telnyx', 'USA', 1, 1.20, 3.50, 'Assigned'),
-('+1 (415) 890-4101', 'Telnyx', 'USA', 1, 1.20, 3.50, 'Assigned'),
-('+1 (800) 459-2099', 'Bandwidth', 'USA', 3, 2.80, 7.50, 'Assigned'),
-('+1 (415) 890-4102', 'Telnyx', 'USA', NULL, 1.20, 3.50, 'Available');
+# Security Headers
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
 `;
 
-  const DB_PHP_CODE = `<?php
-// db.php - Database connection for XAMPP
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Headers: Content-Type");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE");
+  const LOCAL_RUN_COMMANDS = `# 1. Clone repository
+git clone https://github.com/gtawk01s-arch/gpu-and-did-internal-tool.git
+cd gpu-and-did-internal-tool
 
-$host     = 'localhost';
-$dbname   = 'gpu_sip_broker';
-$username = 'root';      // Default XAMPP username
-$password = '';          // Default XAMPP password is blank
+# 2. Install dependencies (Node.js 20+ or 22 recommended)
+npm install
 
-try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
-    ]);
-} catch (PDOException $e) {
-    http_response_code(500);
-    echo json_encode(["error" => "Database connection failed: " . $e->getMessage()]);
-    exit;
+# 3. Create .env configuration (if needed)
+cp .env.example .env
+
+# 4. Start local Vite development server on port 3000
+npm run dev
+
+# App runs locally at: http://localhost:3000
+`;
+
+  const NETLIFY_CLI_COMMANDS = `# 1. Install Netlify CLI globally
+npm install -g netlify-cli
+
+# 2. Login to Netlify account
+netlify login
+
+# 3. Build optimized production assets
+npm run build
+
+# 4. Deploy directly to Netlify production
+netlify deploy --prod --dir=dist
+`;
+
+  const COMPLETE_SQL_SCHEMA = `-- =====================================================================
+-- CELERKO WHOLESALE GPU & DID MANAGEMENT SYSTEM
+-- PostgreSQL / MySQL Relational Schema & Separate Profit Calculations
+-- =====================================================================
+
+-- 1. WHOLESALE GPU CLOUD PROVIDERS (Only GPU Providers)
+CREATE TABLE gpu_cloud_providers (
+    id VARCHAR(36) PRIMARY KEY,
+    name VARCHAR(120) NOT NULL, -- CoreWeave, Lambda Labs, RunPod, Nebius
+    provider_type VARCHAR(60) NOT NULL,
+    api_endpoint VARCHAR(255) NOT NULL,
+    upstream_key_encrypted TEXT NOT NULL, -- NEVER exposed to clients
+    purchased_gpus INT NOT NULL DEFAULT 0,
+    allocated_gpus INT NOT NULL DEFAULT 0,
+    running_gpus INT NOT NULL DEFAULT 0,
+    available_gpus INT GENERATED ALWAYS AS (purchased_gpus - allocated_gpus) STORED,
+    monthly_commitment DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+    api_status VARCHAR(30) NOT NULL DEFAULT 'Operational',
+    api_latency_ms INT NOT NULL DEFAULT 15,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. CLIENT ORGANIZATIONS
+CREATE TABLE clients (
+    id VARCHAR(36) PRIMARY KEY,
+    company_name VARCHAR(150) NOT NULL,
+    email VARCHAR(120) UNIQUE NOT NULL,
+    status VARCHAR(30) NOT NULL DEFAULT 'Active',
+    allocated_gpu_count INT NOT NULL DEFAULT 0,
+    allocated_did_count INT NOT NULL DEFAULT 0,
+    monthly_spend DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+    monthly_cost DECIMAL(14,2) NOT NULL DEFAULT 0.00
+);
+
+-- 3. CLIENT CELERKO API KEYS (Self-Service in Client Panel)
+-- An API key authenticates access; it does NOT automatically allocate a GPU!
+CREATE TABLE client_api_keys (
+    id VARCHAR(36) PRIMARY KEY,
+    client_id VARCHAR(36) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    key_prefix VARCHAR(16) NOT NULL, -- e.g. 'ck_live_9f82d1c7'
+    key_hash VARCHAR(255) NOT NULL,
+    rate_limit_rpm INT NOT NULL DEFAULT 1500,
+    status ENUM('Active', 'Revoked') NOT NULL DEFAULT 'Active',
+    total_requests BIGINT NOT NULL DEFAULT 0,
+    created_at DATE NOT NULL,
+    last_used TIMESTAMP NULL,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+);
+
+-- 4. GPU ALLOCATIONS (Controlled by Admin Panel)
+CREATE TABLE gpu_allocations (
+    id VARCHAR(36) PRIMARY KEY,
+    client_id VARCHAR(36) NOT NULL,
+    gpu_model VARCHAR(100) NOT NULL,
+    quantity INT NOT NULL,
+    ingress_endpoint VARCHAR(255) NOT NULL,
+    monthly_wholesale_cost DECIMAL(12,2) NOT NULL,
+    monthly_selling_price DECIMAL(12,2) NOT NULL,
+    status VARCHAR(30) NOT NULL DEFAULT 'Active',
+    approved_by VARCHAR(100) NOT NULL,
+    approved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE RESTRICT
+);
+
+-- 5. DID TELECOM INVENTORY
+CREATE TABLE did_numbers (
+    id VARCHAR(36) PRIMARY KEY,
+    did_number VARCHAR(40) UNIQUE NOT NULL,
+    country VARCHAR(60) NOT NULL DEFAULT 'India',
+    assigned_client_id VARCHAR(36) NULL,
+    monthly_wholesale_cost DECIMAL(10,2) NOT NULL,
+    monthly_selling_price DECIMAL(10,2) NOT NULL,
+    status ENUM('Available', 'Assigned', 'Suspended') DEFAULT 'Available',
+    FOREIGN KEY (assigned_client_id) REFERENCES clients(id) ON DELETE SET NULL
+);
+
+-- =====================================================================
+-- 6. PROFITABILITY CALCULATIONS: SEPARATE GPU, DID, AND COMBINED VIEWS
+-- =====================================================================
+
+-- GPU Profit Calculation View
+CREATE OR REPLACE VIEW vw_gpu_profitability AS
+SELECT
+    SUM(monthly_selling_price) AS gpu_revenue,
+    SUM(monthly_wholesale_cost) AS gpu_cost,
+    SUM(monthly_selling_price - monthly_wholesale_cost) AS gpu_profit,
+    ROUND(((SUM(monthly_selling_price - monthly_wholesale_cost) / SUM(monthly_selling_price)) * 100), 2) AS gpu_margin_pct,
+    COUNT(id) AS active_allocations
+FROM gpu_allocations
+WHERE status = 'Active';
+
+-- DID Profit Calculation View
+CREATE OR REPLACE VIEW vw_did_profitability AS
+SELECT
+    SUM(monthly_selling_price) AS did_revenue,
+    SUM(monthly_wholesale_cost) AS did_cost,
+    SUM(monthly_selling_price - monthly_wholesale_cost) AS did_profit,
+    ROUND(((SUM(monthly_selling_price - monthly_wholesale_cost) / SUM(monthly_selling_price)) * 100), 2) AS did_margin_pct,
+    COUNT(id) AS assigned_dids
+FROM did_numbers
+WHERE status = 'Assigned';
+
+-- Combined Total Profitability View (GPU + DID)
+CREATE OR REPLACE VIEW vw_consolidated_profitability AS
+SELECT
+    g.gpu_revenue,
+    g.gpu_cost,
+    g.gpu_profit,
+    g.gpu_margin_pct,
+    d.did_revenue,
+    d.did_cost,
+    d.did_profit,
+    d.did_margin_pct,
+    -- Total Combined
+    (g.gpu_revenue + d.did_revenue) AS total_revenue,
+    (g.gpu_cost + d.did_cost) AS total_cost,
+    (g.gpu_profit + d.did_profit) AS total_profit,
+    ROUND((((g.gpu_profit + d.did_profit) / (g.gpu_revenue + d.did_revenue)) * 100), 2) AS total_margin_pct
+FROM vw_gpu_profitability g
+CROSS JOIN vw_did_profitability d;
+`;
+
+  const BACKEND_PROXY_CODE = `// server.ts / api-proxy.ts - Celerko Automatic Backend Request Processor
+import express, { Request, Response } from 'express';
+import crypto from 'crypto';
+
+const app = express();
+app.use(express.json());
+
+// In-memory or database lookups
+const UPSTREAM_GPU_PROVIDERS: Record<string, { endpoint: string; secretApiKey: string }> = {
+  'coreweave': {
+    endpoint: 'https://api.coreweave.com/v1',
+    secretApiKey: process.env.COREWEAVE_UPSTREAM_SECRET || 'sk_cw_secret_live_encrypted',
+  },
+  'lambdalabs': {
+    endpoint: 'https://cloud.lambdalabs.com/api/v1',
+    secretApiKey: process.env.LAMBDALABS_UPSTREAM_SECRET || 'sk_lambda_secret_live_encrypted',
+  },
+};
+
+// Middleware: Validate Client Celerko API Key & Active GPU Allocation
+async function authenticateCelerkoClient(req: Request, res: Response, next: Function) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ck_live_')) {
+    return res.status(401).json({ error: 'Unauthorized: Missing or invalid Celerko API key.' });
+  }
+
+  const clientApiKey = authHeader.replace('Bearer ', '').trim();
+  // Lookup client in database via key hash
+  const clientRecord = await getClientByApiKey(clientApiKey);
+
+  if (!clientRecord) {
+    return res.status(403).json({ error: 'Forbidden: Invalid API key.' });
+  }
+
+  // CRITICAL CHECK: An API key does not automatically allocate a GPU!
+  // Client must have an active GPU allocation approved by Admin
+  if (clientRecord.allocatedGpuCount <= 0) {
+    return res.status(403).json({
+      error: 'No Active GPU Allocation: Your API key is authenticated, but no GPU nodes are currently assigned to your account. Please request allocation in the Client Panel.',
+    });
+  }
+
+  // Attach client context to request
+  (req as any).client = clientRecord;
+  next();
 }
-?>`;
 
-  const API_PHP_CODE = `<?php
-// api.php - Backend REST API for XAMPP
-require_once 'db.php';
-header("Content-Type: application/json");
+// Proxied Inference Endpoint
+app.post('/v1/chat/completions', authenticateCelerkoClient, async (req: Request, res: Response) => {
+  const client = (req as any).client;
+  const upstreamProvider = UPSTREAM_GPU_PROVIDERS['coreweave'];
 
-$method = $_SERVER['REQUEST_METHOD'];
-$action = isset($_GET['action']) ? $_GET['action'] : '';
+  try {
+    // Upstream secret key is injected on the backend and NEVER revealed to the client!
+    const upstreamResponse = await fetch(\`\${upstreamProvider.endpoint}/chat/completions\`, {
+      method: 'POST',
+      headers: {
+        'Authorization': \`Bearer \${upstreamProvider.secretApiKey}\`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(req.body),
+    });
 
-// 1. CLIENT PORTAL LOGIN
-if ($method === 'POST' && $action === 'client_login') {
-    $data = json_decode(file_get_contents("php://input"), true);
-    $user = trim($data['username'] ?? '');
-    $pass = trim($data['password'] ?? '');
+    const data = await upstreamResponse.json();
 
-    $stmt = $pdo->prepare("SELECT * FROM clients WHERE (portal_username = ? OR email = ?) AND portal_password = ?");
-    $stmt->execute([$user, $user, $pass]);
-    $client = $stmt->fetch();
+    // Record usage telemetry, calculate wholesale cost, client charge, and profit
+    await recordUsageTelemetry({
+      clientId: client.id,
+      model: req.body.model,
+      tokens: data.usage?.total_tokens || 0,
+      timestamp: new Date(),
+    });
 
-    if ($client) {
-        unset($client['portal_password']); // Secure
-        echo json_encode(["status" => "success", "client" => $client]);
-    } else {
-        http_response_code(401);
-        echo json_encode(["status" => "error", "message" => "Invalid client portal credentials"]);
-    }
-    exit;
-}
+    res.json(data);
+  } catch (error) {
+    res.status(502).json({ error: 'Upstream GPU Provider Gateway Error' });
+  }
+});
+`;
 
-// 2. GET ALL CLIENTS
-if ($method === 'GET' && $action === 'clients') {
-    $stmt = $pdo->query("SELECT * FROM clients ORDER BY id DESC");
-    echo json_encode($stmt->fetchAll());
-    exit;
-}
-
-// 2. ADD NEW CLIENT (With GPU / DID Needs)
-if ($method === 'POST' && $action === 'add_client') {
-    $data = json_decode(file_get_contents("php://input"), true);
-    
-    $stmt = $pdo->prepare("INSERT INTO clients 
-        (company_name, contact_person, email, phone, address, resource_need, gpu_needed_model, gpu_needed_qty, did_needed_type, did_needed_qty)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        
-    $stmt->execute([
-        $data['company_name'],
-        $data['contact_person'],
-        $data['email'],
-        $data['phone'] ?? '',
-        $data['address'] ?? '',
-        $data['resource_need'] ?? 'Both GPU & DID',
-        $data['gpu_needed_model'] ?? null,
-        $data['gpu_needed_qty'] ?? 0,
-        $data['did_needed_type'] ?? null,
-        $data['did_needed_qty'] ?? 0
-    ]);
-    
-    echo json_encode(["status" => "success", "client_id" => $pdo->lastInsertId()]);
-    exit;
-}
-
-// 3. GET GPU INVENTORY
-if ($method === 'GET' && $action === 'gpus') {
-    $stmt = $pdo->query("SELECT g.*, c.company_name AS assigned_client_name 
-                         FROM gpu_nodes g 
-                         LEFT JOIN clients c ON g.assigned_client_id = c.id");
-    echo json_encode($stmt->fetchAll());
-    exit;
-}
-
-// 4. ALLOCATE GPU TO CLIENT
-if ($method === 'POST' && $action === 'allocate_gpu') {
-    $data = json_decode(file_get_contents("php://input"), true);
-    $gpu_id = $data['gpu_id'];
-    $client_id = $data['client_id'];
-    $qty = (int)$data['quantity'];
-    
-    // Update GPU allocation
-    $stmt = $pdo->prepare("UPDATE gpu_nodes SET assigned_client_id = ?, allocated_quantity = allocated_quantity + ?, status = 'In Use' WHERE id = ?");
-    $stmt->execute([$client_id, $qty, $gpu_id]);
-    
-    echo json_encode(["status" => "success", "message" => "GPU successfully allocated"]);
-    exit;
-}
-
-// 5. CLIENT PORTAL: RAISE NEW RESOURCE REQUEST
-if ($method === 'POST' && $action === 'raise_request') {
-    $data = json_decode(file_get_contents("php://input"), true);
-    $requestCode = 'REQ-' . date('Y') . '-' . rand(1000, 9999);
-    
-    $stmt = $pdo->prepare("INSERT INTO resource_requests 
-        (request_code, client_id, resource_type, specs, quantity, monthly_cost, selling_price, status, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending', ?)");
-        
-    $stmt->execute([
-        $requestCode,
-        $data['client_id'],
-        $data['resource_type'],
-        $data['specs'],
-        $data['quantity'] ?? 1,
-        $data['monthly_cost'] ?? 0.00,
-        $data['selling_price'] ?? 0.00,
-        $data['notes'] ?? ''
-    ]);
-    
-    echo json_encode(["status" => "success", "request_code" => $requestCode]);
-    exit;
-}
-
-// 6. GET ALL REQUESTS (Admin Approvals Desk)
-if ($method === 'GET' && $action === 'requests') {
-    $stmt = $pdo->query("SELECT r.*, c.company_name FROM resource_requests r JOIN clients c ON r.client_id = c.id ORDER BY r.id DESC");
-    echo json_encode($stmt->fetchAll());
-    exit;
-}
-
-echo json_encode(["message" => "GPU & SIP Wholesale API Running on XAMPP"]);
-?>`;
-
-  const STANDALONE_HTML = `<!DOCTYPE html>
+  const STANDALONE_HTML_CSS = `<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPU & SIP Wholesale System (XAMPP)</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Celerko Client Portal & API Access</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card: #111827;
+      --border: #1f2937;
+      --cyan: #06b6d4;
+      --emerald: #10b981;
+      --text: #f3f4f6;
+      --muted: #9ca3af;
+    }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 24px;
+    }
+    .container { max-width: 900px; margin: 0 auto; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    h1, h2, h3 { margin-top: 0; color: #fff; }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      background: rgba(6, 182, 212, 0.15);
+      color: var(--cyan);
+      border: 1px solid var(--cyan);
+    }
+    .badge-success {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--emerald);
+      border-color: var(--emerald);
+    }
+    .code-box {
+      background: #030712;
+      border: 1px solid var(--border);
+      padding: 12px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 13px;
+      color: #38bdf8;
+      overflow-x: auto;
+    }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+    .metric { background: #1f2937; padding: 12px; border-radius: 8px; }
+    .metric-label { font-size: 11px; color: var(--muted); text-transform: uppercase; }
+    .metric-value { font-size: 20px; font-weight: bold; margin-top: 4px; font-family: monospace; }
+  </style>
 </head>
-<body class="bg-slate-900 text-slate-100 font-sans p-6">
-    <div class="max-w-6xl mx-auto space-y-6">
-        <!-- Header -->
-        <header class="flex justify-between items-center border-b border-slate-800 pb-4">
-            <div>
-                <h1 class="text-2xl font-bold text-white">GPU & SIP Wholesale Broker Platform</h1>
-                <p class="text-xs text-slate-400">Running on Local XAMPP (Apache + MySQL/PHP)</p>
-            </div>
-            <span class="px-3 py-1 bg-emerald-900/60 text-emerald-300 border border-emerald-700 rounded text-xs">
-                Localhost Database Connected
-            </span>
-        </header>
-
-        <!-- KPI Grid -->
-        <div class="grid grid-cols-4 gap-4 text-center">
-            <div class="bg-slate-800 p-4 rounded-lg border border-slate-700">
-                <div class="text-xs text-slate-400">Total Monthly Revenue</div>
-                <div class="text-2xl font-bold text-emerald-400">₹37,35,000</div>
-            </div>
-            <div class="bg-slate-800 p-4 rounded-lg border border-slate-700">
-                <div class="text-xs text-slate-400">Wholesale Provider Cost</div>
-                <div class="text-2xl font-bold text-rose-400">₹24,48,000</div>
-            </div>
-            <div class="bg-slate-800 p-4 rounded-lg border border-slate-700">
-                <div class="text-xs text-slate-400">Gross Resale Profit</div>
-                <div class="text-2xl font-bold text-cyan-400">₹12,87,000</div>
-            </div>
-            <div class="bg-slate-800 p-4 rounded-lg border border-slate-700">
-                <div class="text-xs text-slate-400">Arbitrage Margin</div>
-                <div class="text-2xl font-bold text-indigo-400">34.5%</div>
-            </div>
+<body>
+  <div class="container">
+    <h1>Celerko Client GPU & API Portal</h1>
+    
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h3>HyperScale AI India Pvt Ltd</h3>
+          <p style="color:var(--muted); font-size:13px; margin:0;">Client ID: clt-001</p>
         </div>
-
-        <!-- Clients & Allocations Card -->
-        <div class="bg-slate-800 rounded-lg border border-slate-700 p-5">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-lg font-bold text-white">Clients & Resource Needs</h2>
-                <button onclick="alert('Open client modal to select GPU or DID needs')" class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 rounded text-xs font-semibold">
-                    + Add Client & Needs
-                </button>
-            </div>
-            <div id="clients-table" class="text-xs text-slate-300">
-                <p>Fetch client list from: <code>api.php?action=clients</code></p>
-            </div>
+        <span class="badge badge-success">✓ 60x H100 GPUs Active</span>
+      </div>
+      <div class="grid" style="margin-top:16px;">
+        <div class="metric">
+          <div class="metric-label">Allocated GPUs</div>
+          <div class="metric-value" style="color:var(--cyan)">60 Nodes</div>
         </div>
+        <div class="metric">
+          <div class="metric-label">Assigned DIDs</div>
+          <div class="metric-value">180 DIDs</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Monthly Billing</div>
+          <div class="metric-value" style="color:var(--emerald)">₹1,62,50,000</div>
+        </div>
+      </div>
     </div>
+
+    <div class="card">
+      <h3>Your Celerko API Keys</h3>
+      <p style="color:var(--muted); font-size:13px;">
+        An API key gives authenticated access to Celerko's proxy. An active GPU allocation is required to execute workloads.
+      </p>
+      <div class="code-box">ck_live_9f82d1c7••••••••••••••••381f</div>
+      <p style="font-size:12px; color:#10b981; margin-top:8px;">🔒 Upstream provider keys (CoreWeave/Lambda) are encrypted on server and never exposed.</p>
+    </div>
+
+    <div class="card">
+      <h3>Quickstart cURL Request</h3>
+      <pre class="code-box">curl -X POST https://api.celerko.cloud/v1/chat/completions \\
+  -H "Authorization: Bearer ck_live_your_key_here" \\
+  -H "Content-Type: application/json" \\
+  -d '{"model": "meta-llama/Llama-3-70b-instruct", "messages": [{"role": "user", "content": "Hi Celerko!"}]}'</pre>
+    </div>
+  </div>
 </body>
-</html>`;
+</html>
+`;
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <Server className="w-4 h-4 text-cyan-500" />
-            How to Run this System on XAMPP (Apache + MySQL + PHP)
+            <Terminal className="w-4 h-4 text-cyan-500" />
+            Local Run &amp; Netlify Production Deployment Guide
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Step-by-step deployment guide and copy-paste files to host the platform on your local computer using XAMPP.
+            Complete instructions and copyable scripts to run locally on your machine, deploy publicly on Netlify, and manage full HTML/CSS/SQL schemas.
           </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs px-2.5 py-1 rounded-full bg-cyan-100 dark:bg-cyan-950/60 text-cyan-800 dark:text-cyan-300 font-semibold border border-cyan-300 dark:border-cyan-800 flex items-center gap-1.5">
+            <Globe className="w-3.5 h-3.5 text-cyan-500" />
+            <span>Ready for Local &amp; Netlify</span>
+          </span>
         </div>
       </div>
 
-      {/* Navigation Sub-Tabs */}
+      {/* Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2 text-xs overflow-x-auto">
         {[
-          { id: 'instructions', label: '1. Step-by-Step XAMPP Setup' },
-          { id: 'sql', label: '2. MySQL Database Schema (schema.sql)' },
-          { id: 'db_php', label: '3. Database Config (db.php)' },
-          { id: 'api_php', label: '4. PHP Backend API (api.php)' },
-          { id: 'standalone_html', label: '5. Standalone Frontend (index.html)' },
+          { id: 'local', label: '1. How to Run Locally' },
+          { id: 'netlify', label: '2. How to Deploy on Netlify' },
+          { id: 'sql', label: '3. Full SQL Schema & Calculations' },
+          { id: 'backend_proxy', label: '4. Celerko Backend API Proxy' },
+          { id: 'html_css', label: '5. Standalone HTML/CSS Template' },
         ].map(tab => (
           <button
             key={tab.id}
@@ -368,157 +453,231 @@ echo json_encode(["message" => "GPU & SIP Wholesale API Running on XAMPP"]);
         ))}
       </div>
 
-      {/* Tab 1: Instructions */}
-      {activeTab === 'instructions' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg space-y-2">
-              <div className="w-6 h-6 rounded bg-cyan-600 text-white font-bold text-xs flex items-center justify-center">1</div>
-              <h3 className="font-bold text-slate-900 dark:text-slate-100 text-xs">Download &amp; Launch XAMPP</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                Download XAMPP from <strong>apachefriends.org</strong>. Open the XAMPP Control Panel and click <strong>Start</strong> next to <strong>Apache</strong> and <strong>MySQL</strong>.
-              </p>
+      {/* Tab 1: How to Run Locally */}
+      {activeTab === 'local' && (
+        <div className="space-y-5 text-xs">
+          <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
+            <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
+              <Terminal className="w-4 h-4 text-cyan-500" />
+              <span>Step-by-Step: Running Celerko Locally</span>
+            </h3>
+            <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
+              This application is built with <strong>Vite</strong>, <strong>React 19</strong>, and <strong>Tailwind CSS</strong>. Follow these straightforward steps to run it on your local machine:
+            </p>
+
+            <div className="space-y-3 font-mono text-[11px]">
+              <div className="p-4 bg-slate-950 text-slate-200 rounded-xl border border-slate-800 relative">
+                <button
+                  onClick={() => handleCopy('local_cmds', LOCAL_RUN_COMMANDS)}
+                  className="absolute top-3 right-3 px-2 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded text-[11px] font-sans flex items-center gap-1"
+                >
+                  {copiedKey === 'local_cmds' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                  <span>{copiedKey === 'local_cmds' ? 'Copied' : 'Copy'}</span>
+                </button>
+                <pre className="overflow-x-auto m-0 text-cyan-400">{LOCAL_RUN_COMMANDS}</pre>
+              </div>
             </div>
 
-            <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg space-y-2">
-              <div className="w-6 h-6 rounded bg-indigo-600 text-white font-bold text-xs flex items-center justify-center">2</div>
-              <h3 className="font-bold text-slate-900 dark:text-slate-100 text-xs">Create MySQL Database</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                Open browser at <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-[11px]">http://localhost/phpmyadmin</code>. Click the <strong>SQL</strong> tab, copy the code from Tab 2, and press <strong>Go</strong> to build all tables.
-              </p>
-            </div>
-
-            <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg space-y-2">
-              <div className="w-6 h-6 rounded bg-emerald-600 text-white font-bold text-xs flex items-center justify-center">3</div>
-              <h3 className="font-bold text-slate-900 dark:text-slate-100 text-xs">Put Files in htdocs</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                Create a folder: <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-[11px]">C:\xampp\htdocs\gpu-sip</code>. Place <code className="text-cyan-600">db.php</code>, <code className="text-cyan-600">api.php</code>, and <code className="text-cyan-600">index.html</code> inside. Open <code className="font-semibold text-emerald-600">http://localhost/gpu-sip</code> in your browser!
-              </p>
-            </div>
-          </div>
-
-          <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-lg space-y-3">
-            <h4 className="font-bold text-slate-900 dark:text-slate-100 text-xs">Where Are the Files?</h4>
-            <div className="space-y-1.5 font-mono text-xs text-slate-700 dark:text-slate-300">
-              <div>📁 <strong>C:\xampp\htdocs\gpu-sip\</strong></div>
-              <div className="pl-4">├── 📄 <strong>db.php</strong> (Connects to MySQL localhost)</div>
-              <div className="pl-4">├── 📄 <strong>api.php</strong> (Handles client creation, GPU & DID requests, allocation)</div>
-              <div className="pl-4">├── 📄 <strong>schema.sql</strong> (Tables and initial seed data)</div>
-              <div className="pl-4">└── 📄 <strong>index.html</strong> (HTML UI for broker dashboard and client portal)</div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 font-sans">
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-lg border border-slate-200 dark:border-slate-800">
+                <div className="font-bold text-slate-900 dark:text-slate-100 mb-1">Prerequisites</div>
+                <p className="text-slate-500 text-[11px]">
+                  Node.js 20 or Node.js 22 (LTS) installed on your machine with npm.
+                </p>
+              </div>
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-lg border border-slate-200 dark:border-slate-800">
+                <div className="font-bold text-slate-900 dark:text-slate-100 mb-1">Local Port</div>
+                <p className="text-slate-500 text-[11px]">
+                  The development server automatically binds to <strong className="font-mono text-cyan-500">http://localhost:3000</strong>.
+                </p>
+              </div>
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-lg border border-slate-200 dark:border-slate-800">
+                <div className="font-bold text-slate-900 dark:text-slate-100 mb-1">Production Build Check</div>
+                <p className="text-slate-500 text-[11px]">
+                  Run <strong className="font-mono">npm run build</strong> locally to verify TypeScript type checking and dist bundling.
+                </p>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Tab 2: SQL Schema */}
+      {/* Tab 2: How to Deploy on Netlify */}
+      {activeTab === 'netlify' && (
+        <div className="space-y-5 text-xs">
+          <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
+                <Cloud className="w-4 h-4 text-cyan-500" />
+                <span>Step-by-Step: Deploying Publicly to Netlify</span>
+              </h3>
+              <button
+                onClick={() => handleDownload('netlify.toml', NETLIFY_TOML_CONTENT)}
+                className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-[11px] font-semibold flex items-center gap-1 shadow-xs"
+              >
+                <Download className="w-3 h-3" />
+                <span>Download netlify.toml</span>
+              </button>
+            </div>
+
+            <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
+              Netlify provides instant global CDN hosting with automated SSL certificates. A pre-configured <strong className="font-mono text-cyan-500">netlify.toml</strong> file is already included at your repository root to configure single-page app (SPA) rewrites.
+            </p>
+
+            {/* Method A: GitHub Integration */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700/80 space-y-2">
+              <div className="font-bold text-slate-900 dark:text-slate-100 text-xs flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                <span>Method A: Git Push (Recommended for Automatic Continuous Deployment)</span>
+              </div>
+              <ol className="list-decimal pl-5 space-y-1.5 text-slate-600 dark:text-slate-300 text-[11px]">
+                <li>Push this repository to GitHub, GitLab, or Bitbucket.</li>
+                <li>Go to <strong className="font-mono text-cyan-500">app.netlify.com</strong> and click <strong>"Add new site" → "Import an existing project"</strong>.</li>
+                <li>Select your repository: <strong className="font-mono">gpu-and-did-internal-tool</strong>.</li>
+                <li>Netlify will automatically detect settings from <strong className="font-mono">netlify.toml</strong>:
+                  <ul className="list-disc pl-5 mt-1 font-mono text-[10px] text-slate-400">
+                    <li>Build command: <strong className="text-cyan-400">npm run build</strong></li>
+                    <li>Publish directory: <strong className="text-cyan-400">dist</strong></li>
+                  </ul>
+                </li>
+                <li>Click <strong>"Deploy site"</strong>. Your app will be live globally in under 60 seconds at a free <strong className="font-mono">*.netlify.app</strong> URL!</li>
+              </ol>
+            </div>
+
+            {/* Method B: Netlify CLI */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700/80 space-y-2">
+              <div className="font-bold text-slate-900 dark:text-slate-100 text-xs flex items-center gap-1.5">
+                <Terminal className="w-4 h-4 text-cyan-500" />
+                <span>Method B: 1-Command Deploy via Netlify CLI</span>
+              </div>
+              <div className="p-3 bg-slate-950 text-slate-200 rounded-lg border border-slate-800 font-mono text-[11px] relative">
+                <button
+                  onClick={() => handleCopy('cli_cmds', NETLIFY_CLI_COMMANDS)}
+                  className="absolute top-2 right-2 px-2 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded text-[10px] font-sans flex items-center gap-1"
+                >
+                  {copiedKey === 'cli_cmds' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                  <span>{copiedKey === 'cli_cmds' ? 'Copied' : 'Copy'}</span>
+                </button>
+                <pre className="overflow-x-auto m-0 text-cyan-400">{NETLIFY_CLI_COMMANDS}</pre>
+              </div>
+            </div>
+
+            {/* netlify.toml Viewer */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center text-[11px] text-slate-400 font-mono">
+                <span>Production Configuration (/netlify.toml):</span>
+                <button
+                  onClick={() => handleCopy('netlify_toml', NETLIFY_TOML_CONTENT)}
+                  className="text-cyan-500 hover:underline flex items-center gap-1"
+                >
+                  <Copy className="w-3 h-3" />
+                  <span>Copy Configuration</span>
+                </button>
+              </div>
+              <div className="p-3 bg-slate-950 text-slate-300 rounded-lg border border-slate-800 font-mono text-[11px] overflow-x-auto">
+                <pre className="m-0 text-slate-300">{NETLIFY_TOML_CONTENT}</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 3: Full SQL Schema & Separate Calculations */}
       {activeTab === 'sql' && (
-        <div className="bg-slate-950 rounded-xl border border-slate-800 overflow-hidden font-mono text-xs">
-          <div className="p-3 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
-            <span className="text-slate-300">schema_mysql.sql (Import in phpMyAdmin)</span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => handleDownload('schema_mysql.sql', MYSQL_SCHEMA_SQL)}
-                className="px-2.5 py-1 text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded flex items-center gap-1"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Download .sql</span>
-              </button>
-              <button
-                onClick={() => handleCopy('sql', MYSQL_SCHEMA_SQL)}
-                className="px-2.5 py-1 text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded flex items-center gap-1"
-              >
-                {copiedKey === 'sql' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copiedKey === 'sql' ? 'Copied' : 'Copy SQL'}</span>
-              </button>
+        <div className="space-y-5 text-xs">
+          <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
+                  <Database className="w-4 h-4 text-cyan-500" />
+                  <span>Production SQL DDL &amp; Separate Profit Calculation Views</span>
+                </h3>
+                <p className="text-slate-500 text-xs mt-0.5">
+                  Tables for GPU Providers, Capacity, Client API Keys, Allocations, and SQL views for GPU profit, DID profit, and combined total profit.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleCopy('sql_schema', COMPLETE_SQL_SCHEMA)}
+                  className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-800 dark:text-slate-200 rounded text-[11px] font-semibold flex items-center gap-1"
+                >
+                  {copiedKey === 'sql_schema' ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                  <span>Copy SQL</span>
+                </button>
+                <button
+                  onClick={() => handleDownload('schema.sql', COMPLETE_SQL_SCHEMA)}
+                  className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-[11px] font-semibold flex items-center gap-1"
+                >
+                  <Download className="w-3 h-3" />
+                  <span>Download schema.sql</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-950 text-slate-200 rounded-xl border border-slate-800 font-mono text-[11px] max-h-96 overflow-y-auto">
+              <pre className="m-0 text-slate-300">{COMPLETE_SQL_SCHEMA}</pre>
             </div>
           </div>
-          <pre className="p-4 text-emerald-300/90 overflow-x-auto leading-relaxed max-h-[500px]">
-            {MYSQL_SCHEMA_SQL}
-          </pre>
         </div>
       )}
 
-      {/* Tab 3: db.php */}
-      {activeTab === 'db_php' && (
-        <div className="bg-slate-950 rounded-xl border border-slate-800 overflow-hidden font-mono text-xs">
-          <div className="p-3 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
-            <span className="text-slate-300">db.php (Save in C:\xampp\htdocs\gpu-sip\db.php)</span>
-            <div className="flex items-center gap-2">
+      {/* Tab 4: Backend API Proxy */}
+      {activeTab === 'backend_proxy' && (
+        <div className="space-y-5 text-xs">
+          <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
+                  <Code2 className="w-4 h-4 text-cyan-500" />
+                  <span>Celerko Backend Proxy Pattern (Node.js &amp; Express)</span>
+                </h3>
+                <p className="text-slate-500 text-xs mt-0.5">
+                  Validates client API keys, verifies active GPU allocation, and proxies requests securely without exposing upstream provider keys.
+                </p>
+              </div>
               <button
-                onClick={() => handleDownload('db.php', DB_PHP_CODE)}
-                className="px-2.5 py-1 text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded flex items-center gap-1"
+                onClick={() => handleCopy('proxy_code', BACKEND_PROXY_CODE)}
+                className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-[11px] font-semibold flex items-center gap-1"
               >
-                <Download className="w-3.5 h-3.5" />
-                <span>Download .php</span>
-              </button>
-              <button
-                onClick={() => handleCopy('db_php', DB_PHP_CODE)}
-                className="px-2.5 py-1 text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded flex items-center gap-1"
-              >
-                {copiedKey === 'db_php' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copiedKey === 'db_php' ? 'Copied' : 'Copy PHP'}</span>
+                {copiedKey === 'proxy_code' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                <span>Copy Code</span>
               </button>
             </div>
+
+            <div className="p-3 bg-slate-950 text-slate-200 rounded-xl border border-slate-800 font-mono text-[11px] max-h-96 overflow-y-auto">
+              <pre className="m-0 text-slate-300">{BACKEND_PROXY_CODE}</pre>
+            </div>
           </div>
-          <pre className="p-4 text-cyan-300/90 overflow-x-auto leading-relaxed max-h-[500px]">
-            {DB_PHP_CODE}
-          </pre>
         </div>
       )}
 
-      {/* Tab 4: api.php */}
-      {activeTab === 'api_php' && (
-        <div className="bg-slate-950 rounded-xl border border-slate-800 overflow-hidden font-mono text-xs">
-          <div className="p-3 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
-            <span className="text-slate-300">api.php (Save in C:\xampp\htdocs\gpu-sip\api.php)</span>
-            <div className="flex items-center gap-2">
+      {/* Tab 5: Standalone HTML/CSS Template */}
+      {activeTab === 'html_css' && (
+        <div className="space-y-5 text-xs">
+          <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
+                  <FileCode className="w-4 h-4 text-cyan-500" />
+                  <span>Standalone Pure HTML &amp; CSS Client Portal Template</span>
+                </h3>
+                <p className="text-slate-500 text-xs mt-0.5">
+                  Self-contained single-file HTML &amp; CSS template that can be hosted on static servers or XAMPP.
+                </p>
+              </div>
               <button
-                onClick={() => handleDownload('api.php', API_PHP_CODE)}
-                className="px-2.5 py-1 text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded flex items-center gap-1"
+                onClick={() => handleDownload('portal.html', STANDALONE_HTML_CSS)}
+                className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-[11px] font-semibold flex items-center gap-1"
               >
-                <Download className="w-3.5 h-3.5" />
-                <span>Download .php</span>
-              </button>
-              <button
-                onClick={() => handleCopy('api_php', API_PHP_CODE)}
-                className="px-2.5 py-1 text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded flex items-center gap-1"
-              >
-                {copiedKey === 'api_php' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copiedKey === 'api_php' ? 'Copied' : 'Copy PHP API'}</span>
+                <Download className="w-3 h-3" />
+                <span>Download portal.html</span>
               </button>
             </div>
-          </div>
-          <pre className="p-4 text-purple-300/90 overflow-x-auto leading-relaxed max-h-[500px]">
-            {API_PHP_CODE}
-          </pre>
-        </div>
-      )}
 
-      {/* Tab 5: index.html */}
-      {activeTab === 'standalone_html' && (
-        <div className="bg-slate-950 rounded-xl border border-slate-800 overflow-hidden font-mono text-xs">
-          <div className="p-3 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
-            <span className="text-slate-300">index.html (Save in C:\xampp\htdocs\gpu-sip\index.html)</span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => handleDownload('index.html', STANDALONE_HTML)}
-                className="px-2.5 py-1 text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded flex items-center gap-1"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Download .html</span>
-              </button>
-              <button
-                onClick={() => handleCopy('html', STANDALONE_HTML)}
-                className="px-2.5 py-1 text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded flex items-center gap-1"
-              >
-                {copiedKey === 'html' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copiedKey === 'html' ? 'Copied' : 'Copy HTML'}</span>
-              </button>
+            <div className="p-3 bg-slate-950 text-slate-200 rounded-xl border border-slate-800 font-mono text-[11px] max-h-96 overflow-y-auto">
+              <pre className="m-0 text-slate-300">{STANDALONE_HTML_CSS}</pre>
             </div>
           </div>
-          <pre className="p-4 text-amber-300/90 overflow-x-auto leading-relaxed max-h-[500px]">
-            {STANDALONE_HTML}
-          </pre>
         </div>
       )}
     </div>
