@@ -6,6 +6,25 @@ export type UserRole =
   | 'Support Agent'
   | 'Client Portal User';
 
+export interface UserAccessPermissions {
+  dashboard: boolean;
+  allocations: boolean;
+  gpus: boolean;
+  sips: boolean;
+  clients: boolean;
+  providers: boolean;
+  finance: boolean;
+  invoices: boolean;
+  payments: boolean;
+  alerts: boolean;
+  audit: boolean;
+  reports: boolean;
+  users: boolean;
+  database: boolean;
+  bonusTools?: boolean;
+  xampp?: boolean;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -17,6 +36,8 @@ export interface User {
   activeSessions: number;
   avatarUrl?: string;
   createdAt: string;
+  passwordHash: string; // SHA-256 secure hash - no plain text stored
+  permissions?: UserAccessPermissions; // Granular access rights configured by Super Admin
 }
 
 export type GpuStatus = 'In Use' | 'Available' | 'Reserved' | 'Maintenance';
@@ -84,7 +105,8 @@ export interface Client {
   phone: string;
   email: string;
   portalUsername?: string; // Client portal login email/username
-  portalPassword?: string; // Client portal access password
+  portalPasswordHash: string; // SHA-256 secure hash - strictly no plain-text passwords
+  portalPassword?: string; // Optional legacy compatibility field - masked in UI
   address: string;
   status: 'Active' | 'Delinquent' | 'Trial' | 'Suspended';
   resourceRequirement: ResourceRequirement;
@@ -98,6 +120,9 @@ export interface Client {
   monthlySpend: number;
   monthlyCost: number;
   marginPercent: number;
+  unbilledUsage?: number; // Unbilled usage accruals in INR ₹
+  unbilledGpuHours?: number; // Accumulated unbilled GPU cluster hours
+  unbilledSipMinutes?: number; // Accumulated unbilled carrier minutes
   joinedDate: string;
 }
 
@@ -117,6 +142,7 @@ export interface PendingRequest {
   status: AllocationStatus;
   requestedBy: string;
   notes?: string;
+  holdReason?: string; // Mandatory explanation when placed on Hold
 }
 
 export type ResourceType = 'GPU Cluster' | 'DID / SIP Trunk';

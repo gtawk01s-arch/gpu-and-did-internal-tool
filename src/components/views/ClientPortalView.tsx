@@ -58,6 +58,8 @@ export const ClientPortalView: React.FC = () => {
     getClientPortalUrl,
     getClientShareMessage,
     returnToBrokerAdmin,
+    navigateToAdminLogin,
+    isAdminLoggedIn,
   } = useApp();
 
   // Login form state
@@ -217,14 +219,16 @@ export const ClientPortalView: React.FC = () => {
         <div className="w-full max-w-xl p-3 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between text-xs text-slate-300 shadow-md">
           <div className="flex items-center gap-2">
             <Building2 className="w-4 h-4 text-cyan-400 shrink-0" />
-            <span className="font-semibold text-white">Dedicated Client Portal URL</span>
-            <span className="text-slate-500 hidden sm:inline">| Standalone Mode</span>
+            <span className="font-semibold text-white">Client Portal URL</span>
+            <span className="text-slate-500 hidden sm:inline font-mono text-[11px]">(?panel=client)</span>
           </div>
           <button
-            onClick={() => returnToBrokerAdmin('clients')}
-            className="px-2.5 py-1 text-[11px] font-semibold text-white bg-cyan-600 hover:bg-cyan-500 rounded-lg transition-colors flex items-center gap-1 shadow-xs"
+            onClick={() => navigateToAdminLogin()}
+            className="px-2.5 py-1 text-[11px] font-semibold text-cyan-300 bg-slate-800 hover:bg-slate-700 border border-cyan-800/60 rounded-lg transition-colors flex items-center gap-1 shadow-xs"
+            title="Switch to Admin Panel Login Dashboard"
           >
-            ← Return to Admin Portal
+            <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Admin Panel Login Dashboard →</span>
           </button>
         </div>
 
@@ -399,15 +403,20 @@ export const ClientPortalView: React.FC = () => {
             </div>
           </div>
 
-          {/* Link back to admin platform */}
-          <div className="text-center text-xs text-slate-500">
-            <span>Are you a wholesale broker operator? </span>
-            <button
-              onClick={() => returnToBrokerAdmin('clients')}
-              className="text-cyan-600 dark:text-cyan-400 font-semibold hover:underline"
-            >
-              Go to Broker Admin Console →
-            </button>
+          {/* Link to Admin Panel Login Dashboard */}
+          <div className="text-center space-y-1.5 text-xs text-slate-500">
+            <div>
+              <span>Need administrator / operator access? </span>
+              <button
+                onClick={() => navigateToAdminLogin()}
+                className="text-cyan-600 dark:text-cyan-400 font-bold hover:underline inline-flex items-center gap-1"
+              >
+                <span>Go to Admin Panel Login Dashboard (?panel=admin) →</span>
+              </button>
+            </div>
+            <div className="text-[11px] text-slate-400 font-mono">
+              Separate URLs: <span className="text-cyan-600 dark:text-cyan-400 font-semibold">?panel=client</span> (Clients) · <span className="text-indigo-600 dark:text-indigo-400 font-semibold">?panel=admin</span> (Admin)
+            </div>
           </div>
         </div>
       </div>
@@ -493,10 +502,12 @@ export const ClientPortalView: React.FC = () => {
             <span>{copiedUrl ? 'URL Copied!' : 'Copy Dedicated URL'}</span>
           </button>
           <button
-            onClick={() => returnToBrokerAdmin('clients')}
-            className="px-2.5 py-1 text-[11px] font-semibold bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg transition-colors flex items-center gap-1 shadow-xs"
+            onClick={() => navigateToAdminLogin()}
+            className="px-2.5 py-1 text-[11px] font-semibold bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 rounded-lg transition-colors flex items-center gap-1 shadow-xs"
+            title="Switch to Admin Panel Login Dashboard"
           >
-            <span>Broker Console →</span>
+            <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Admin Panel Login Dashboard →</span>
           </button>
         </div>
       </div>
@@ -582,10 +593,16 @@ export const ClientPortalView: React.FC = () => {
       )}
 
       {/* Quick KPI Overview */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <MetricCard label="Active Dedicated GPUs" value={`${totalGpuUnits} Nodes`} subValue={clientGpus.length > 0 ? clientGpus[0].gpuModel : 'None'} highlight badge="Compute" />
         <MetricCard label="Active DID Numbers" value={`${clientDids.length} Numbers`} subValue="Inbound VoIP lines" badge="Telecom" />
         <MetricCard label="Monthly Billing" value={formatINR(client.monthlySpend)} subValue="Active contracts" badge="Billing" />
+        <MetricCard
+          label="Unbilled Accruals"
+          value={client.unbilledUsage && client.unbilledUsage > 0 ? formatINR(client.unbilledUsage) : '₹0'}
+          subValue={client.unbilledGpuHours ? `${client.unbilledGpuHours}h GPU · ${client.unbilledSipMinutes || 0}m SIP` : 'Current cycle'}
+          badge="Unbilled"
+        />
         <MetricCard label="Pending Requests" value={clientRequests.filter(r => r.status === 'Pending').length} subValue="Awaiting broker review" badge="Queue" />
       </div>
 
@@ -672,7 +689,14 @@ export const ClientPortalView: React.FC = () => {
                         {req.date}
                       </td>
                       <td className="py-2.5 px-3">
-                        <StatusBadge status={req.status} />
+                        <div className="space-y-1">
+                          <StatusBadge status={req.status} />
+                          {req.status === 'Hold' && req.holdReason && (
+                            <div className="text-[10px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 p-1 rounded border border-amber-200 dark:border-amber-800 font-medium max-w-[200px]">
+                              Reason: {req.holdReason}
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="py-2.5 px-3 text-right">
                         {req.status === 'Pending' ? (

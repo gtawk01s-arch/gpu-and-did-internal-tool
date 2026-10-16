@@ -223,14 +223,14 @@ export const SipManagementView: React.FC = () => {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
-              {activeChannels.toLocaleString()} / {totalChannels.toLocaleString()} Active Channels ({Math.round((activeChannels / totalChannels) * 100)}%)
+              {totalChannels > 0 ? `${activeChannels.toLocaleString()} / ${totalChannels.toLocaleString()} Active Channels (${Math.round((activeChannels / totalChannels) * 100)}%)` : '0 Active Channels (0%)'}
             </span>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
           {sipProviders.map(prov => {
-            const util = Math.round((prov.activeChannels / prov.maxChannels) * 100);
+            const util = prov.maxChannels > 0 ? Math.round((prov.activeChannels / prov.maxChannels) * 100) : 0;
             const trunkDids = dids.filter(d => d.sipTrunkId === prov.id || d.provider === prov.providerName);
             const trunkAvailable = trunkDids.filter(d => d.status === 'Available').length;
             const trunkAssigned = trunkDids.filter(d => d.status === 'Assigned').length;
@@ -402,7 +402,7 @@ export const SipManagementView: React.FC = () => {
               ) : (
                 filteredDids.map(did => {
                   const spread = did.sellingPrice - did.monthlyCost;
-                  const marginPct = Math.round((spread / did.sellingPrice) * 100);
+                  const marginPct = did.sellingPrice > 0 ? Math.round((spread / did.sellingPrice) * 100) : 0;
                   const linkedTrunk = sipProviders.find(p => p.id === did.sipTrunkId || p.sipTrunkName === did.sipTrunkName);
                   const trunkDisplayName = did.sipTrunkName || linkedTrunk?.sipTrunkName || 'Default Interconnect';
 

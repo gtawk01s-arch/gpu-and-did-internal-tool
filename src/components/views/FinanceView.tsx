@@ -510,6 +510,7 @@ export const FinanceView: React.FC = () => {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
                 {clients.map(c => {
                   const profit = c.monthlySpend - c.monthlyCost;
+                  const margin = c.monthlySpend > 0 ? ((profit / c.monthlySpend) * 100).toFixed(1) : '0.0';
                   return (
                     <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                       <td className="py-2.5 px-3 font-bold font-sans text-slate-900 dark:text-slate-100">
@@ -534,7 +535,7 @@ export const FinanceView: React.FC = () => {
                         +{formatINR(profit)}
                       </td>
                       <td className="py-2.5 px-3 text-right font-bold text-emerald-600 dark:text-emerald-400">
-                        {c.marginPercent}%
+                        {c.monthlySpend > 0 ? `${margin}%` : '–'}
                       </td>
                     </tr>
                   );

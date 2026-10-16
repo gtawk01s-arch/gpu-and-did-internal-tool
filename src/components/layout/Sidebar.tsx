@@ -19,7 +19,7 @@ import {
 import { useApp } from '../../context/AppContext';
 
 export const Sidebar: React.FC = () => {
-  const { activeTab, setActiveTab, pendingRequests, alerts, setIsClientPortalMode } = useApp();
+  const { activeTab, setActiveTab, pendingRequests, alerts, setIsClientPortalMode, currentUser, calculatedResaleMargin } = useApp();
 
   const pendingCount = pendingRequests.filter(r => r.status === 'Pending').length;
   const criticalCount = alerts.filter(a => !a.resolved && a.severity === 'Critical').length;
@@ -41,8 +41,34 @@ export const Sidebar: React.FC = () => {
     { id: 'audit', label: 'Audit Logs & IP Trail', icon: ShieldCheck },
     { id: 'users', label: 'Users & Passwords', icon: Lock },
     { id: 'bonus-tools', label: 'Calculators & Forecast', icon: Sparkles },
-    { id: 'database', label: 'SQL Schema & Queries', icon: Database },
-     ];
+    ...(currentUser.role === 'Super Admin'
+      ? [{ id: 'database', label: 'SQL Schema (Read-Only)', icon: Database }]
+      : []),
+  ];
+
+  const canAccess = (tabId: string): boolean => {
+    if (currentUser.role === 'Super Admin') return true;
+    if (!currentUser.permissions) return true;
+    const permMap: Record<string, boolean | undefined> = {
+      dashboard: currentUser.permissions.dashboard,
+      approvals: currentUser.permissions.allocations,
+      gpus: currentUser.permissions.gpus,
+      sips: currentUser.permissions.sips,
+      clients: currentUser.permissions.clients,
+      providers: currentUser.permissions.providers,
+      invoices: currentUser.permissions.invoices,
+      finance: currentUser.permissions.finance,
+      alerts: currentUser.permissions.alerts,
+      audit: currentUser.permissions.audit,
+      users: currentUser.permissions.users,
+      'bonus-tools': currentUser.permissions.bonusTools,
+      database: Boolean(currentUser.permissions.database && (currentUser.role as string) === 'Super Admin'),
+    };
+    return permMap[tabId] !== false;
+  };
+
+  const filteredPrimary = primaryItems.filter(i => canAccess(i.id));
+  const filteredSecondary = secondaryItems.filter(i => canAccess(i.id));
 
   const handleNavClick = (id: string) => {
     setActiveTab(id);
@@ -56,7 +82,7 @@ export const Sidebar: React.FC = () => {
             Main Platform
           </div>
           <nav className="space-y-1">
-            {primaryItems.map(item => {
+            {filteredPrimary.map(item => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
               return (
@@ -93,7 +119,7 @@ export const Sidebar: React.FC = () => {
             Utilities
           </div>
           <nav className="space-y-1">
-            {secondaryItems.map(item => {
+            {filteredSecondary.map(item => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
               return (
@@ -138,7 +164,7 @@ export const Sidebar: React.FC = () => {
 
         <div className="flex justify-between items-center text-slate-500 pt-1">
           <span>Resale Margin:</span>
-          <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">34.5%</span>
+          <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{calculatedResaleMargin}</span>
         </div>
         <div className="flex justify-between items-center text-slate-400 text-[10px]">
           <span>Tata · Airtel · Jio · E2E</span>

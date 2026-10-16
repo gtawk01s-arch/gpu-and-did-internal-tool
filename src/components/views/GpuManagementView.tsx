@@ -216,7 +216,7 @@ export const GpuManagementView: React.FC = () => {
                         {formatINR(gpu.sellingPrice)}/mo
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono tabular-nums font-semibold text-cyan-600 dark:text-cyan-400">
-                        {gpu.marginPercent.toFixed(1)}%
+                        {gpu.sellingPrice > 0 ? `${(((gpu.sellingPrice - gpu.monthlyCost) / gpu.sellingPrice) * 100).toFixed(1)}%` : '–'}
                       </td>
                       <td className="py-2.5 px-3 text-[11px] font-mono text-slate-500">
                         <div>{gpu.contractStart}</div>
@@ -319,16 +319,16 @@ export const GpuManagementView: React.FC = () => {
               <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded border border-slate-200 dark:border-slate-700/50 space-y-1 font-mono text-[11px]">
                 <div className="flex justify-between">
                   <span>Wholesale Cost:</span>
-                  <span className="tabular-nums">${(allocatingGpu.monthlyCost * allocQuantity).toLocaleString()}/mo</span>
+                  <span className="tabular-nums">{formatINR(allocatingGpu.monthlyCost * allocQuantity)}/mo</span>
                 </div>
                 <div className="flex justify-between font-semibold text-emerald-600 dark:text-emerald-400">
                   <span>Client Resale Price:</span>
-                  <span className="tabular-nums">${(allocatingGpu.sellingPrice * allocQuantity).toLocaleString()}/mo</span>
+                  <span className="tabular-nums">{formatINR(allocatingGpu.sellingPrice * allocQuantity)}/mo</span>
                 </div>
                 <div className="flex justify-between text-cyan-600 dark:text-cyan-400">
                   <span>Wholesale Spread:</span>
                   <span className="tabular-nums">
-                    ${((allocatingGpu.sellingPrice - allocatingGpu.monthlyCost) * allocQuantity).toLocaleString()}/mo ({allocatingGpu.marginPercent.toFixed(1)}%)
+                    +{formatINR((allocatingGpu.sellingPrice - allocatingGpu.monthlyCost) * allocQuantity)}/mo ({allocatingGpu.sellingPrice > 0 ? (((allocatingGpu.sellingPrice - allocatingGpu.monthlyCost) / allocatingGpu.sellingPrice) * 100).toFixed(1) + '%' : '–'})
                   </span>
                 </div>
               </div>

@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   Database,
   Code2,
-  Play,
   Copy,
   Check,
   Server,
@@ -10,13 +9,18 @@ import {
   FileCode,
   Layers,
   Network,
+  Lock,
+  ShieldCheck,
+  AlertTriangle,
 } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
 
 export const DatabaseDesignView: React.FC = () => {
+  const { currentUser } = useApp();
   const [activeTab, setActiveTab] = useState<'sql-schema' | 'sql-runner' | 'prisma' | 'api' | 'architecture'>('sql-schema');
   const [copied, setCopied] = useState(false);
 
-  // SQL Runner state
+  // Read-only SQL templates state
   const [selectedPresetQuery, setSelectedPresetQuery] = useState('spread_by_client');
   const [customSql, setCustomSql] = useState('');
   const [queryResult, setQueryResult] = useState<any[] | null>(null);
@@ -464,6 +468,20 @@ ORDER BY channel_saturation_percent DESC;`,
     setTimeout(() => setCopied(false), 2000);
   };
 
+  if (currentUser.role !== 'Super Admin') {
+    return (
+      <div className="p-12 text-center space-y-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl">
+        <div className="w-12 h-12 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-600 flex items-center justify-center mx-auto">
+          <Lock className="w-6 h-6" />
+        </div>
+        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Super Admin Restricted Module</h3>
+        <p className="text-xs text-slate-500 max-w-md mx-auto">
+          Database schemas, DDL scripts, and SQL structures are strictly restricted to Super Administrators in read-only mode.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -471,19 +489,37 @@ ORDER BY channel_saturation_percent DESC;`,
         <div>
           <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <Database className="w-4 h-4 text-cyan-500" />
-            Database Architecture &amp; Interactive SQL Hub
+            Database Architecture &amp; SQL Schema (Read-Only)
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            PostgreSQL relational DDL schemas, Prisma ORM models, and live query execution simulator.
+            PostgreSQL relational DDL schemas, Prisma ORM models, and pre-compiled query templates for Super Admin inspection.
           </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs px-2.5 py-1 rounded-full bg-cyan-100 dark:bg-cyan-950/60 text-cyan-800 dark:text-cyan-300 font-semibold border border-cyan-300 dark:border-cyan-800 flex items-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5 text-cyan-500" />
+            <span>Super Admin Read-Only Mode</span>
+          </span>
+        </div>
+      </div>
+
+      {/* Security Hardening Callout */}
+      <div className="p-3 bg-slate-900 border border-cyan-500/30 rounded-xl flex items-center justify-between text-xs text-slate-300 shadow-xs">
+        <div className="flex items-center gap-2.5">
+          <Lock className="w-4 h-4 text-cyan-400 shrink-0" />
+          <span>
+            <strong className="text-cyan-300">Security Policy: </strong>
+            Database modifications and arbitrary query executions are strictly disabled in the web console to prevent injection risks.
+          </span>
         </div>
       </div>
 
       {/* Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2 text-xs overflow-x-auto">
         {[
-          { id: 'sql-schema', label: 'PostgreSQL Schema DDL' },
-          { id: 'sql-runner', label: 'Interactive SQL Query Runner' },
+          { id: 'sql-schema', label: 'PostgreSQL Schema DDL (Read-Only)' },
+          { id: 'sql-runner', label: 'SQL Query Templates (Read-Only)' },
           { id: 'prisma', label: 'Prisma Models (schema.prisma)' },
           { id: 'api', label: 'Backend REST API Spec' },
           { id: 'architecture', label: 'System Architecture & Data Flows' },
@@ -525,7 +561,7 @@ ORDER BY channel_saturation_percent DESC;`,
         </div>
       )}
 
-      {/* Tab 2: Interactive SQL Runner */}
+      {/* Tab 2: SQL Query Templates (Read-Only) */}
       {activeTab === 'sql-runner' && (
         <div className="space-y-4">
           <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg space-y-3">
@@ -533,7 +569,7 @@ ORDER BY channel_saturation_percent DESC;`,
               <div className="flex items-center gap-2">
                 <Terminal className="w-4 h-4 text-cyan-500" />
                 <span className="font-bold text-slate-900 dark:text-slate-100">
-                  Select Preset Wholesale Analytics Query:
+                  Select Wholesale Analytics Query Template:
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -541,7 +577,6 @@ ORDER BY channel_saturation_percent DESC;`,
                   value={selectedPresetQuery}
                   onChange={e => {
                     setSelectedPresetQuery(e.target.value);
-                    setQueryResult(null);
                   }}
                   className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100 text-xs"
                 >
@@ -551,13 +586,10 @@ ORDER BY channel_saturation_percent DESC;`,
                     </option>
                   ))}
                 </select>
-                <button
-                  onClick={handleRunQuery}
-                  className="px-4 py-1.5 font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded flex items-center gap-1.5 transition-colors"
-                >
-                  <Play className="w-3.5 h-3.5" />
-                  <span>Execute SQL</span>
-                </button>
+                <span className="px-3 py-1 text-[11px] font-semibold text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded flex items-center gap-1">
+                  <Lock className="w-3 h-3 text-cyan-400" />
+                  <span>Read-Only Template</span>
+                </span>
               </div>
             </div>
 

@@ -45,6 +45,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCommandPalette }) => {
     apiKeys,
     clearAllMockData,
     restoreDemoData,
+    adminLogout,
   } = useApp();
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [showAlertMenu, setShowAlertMenu] = useState(false);
@@ -233,6 +234,16 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCommandPalette }) => {
             </div>
           )}
         </div>
+
+        {/* Admin Sign Out / Lock Session */}
+        <button
+          onClick={adminLogout}
+          title="Sign out & lock administrative session"
+          className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors border border-slate-200 dark:border-slate-700"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Sign Out</span>
+        </button>
       </div>
 
       {/* Mock Data Source Management Modal */}

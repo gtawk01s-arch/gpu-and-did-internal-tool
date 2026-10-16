@@ -53,14 +53,18 @@ export const ReportsView: React.FC = () => {
       ]);
     } else if (selectedReport === 'revenue' || selectedReport === 'profit') {
       headers = ['Client', 'Resource Need', 'Monthly Spend', 'Monthly Cost', 'Gross Profit', 'Margin %'];
-      rows = clients.map(c => [
-        c.companyName,
-        c.resourceRequirement,
-        String(c.monthlySpend),
-        String(c.monthlyCost),
-        String(c.monthlySpend - c.monthlyCost),
-        `${c.marginPercent}%`,
-      ]);
+      rows = clients.map(c => {
+        const profit = c.monthlySpend - c.monthlyCost;
+        const margin = c.monthlySpend > 0 ? ((profit / c.monthlySpend) * 100).toFixed(1) + '%' : '0%';
+        return [
+          c.companyName,
+          c.resourceRequirement,
+          String(c.monthlySpend),
+          String(c.monthlyCost),
+          String(profit),
+          margin,
+        ];
+      });
     } else {
       headers = ['Item', 'Details', 'Status'];
       rows = [['Data', 'Consolidated Wholesale Report', 'Ready']];
@@ -218,6 +222,7 @@ export const ReportsView: React.FC = () => {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono text-[11px]">
                 {clients.map(c => {
                   const profit = c.monthlySpend - c.monthlyCost;
+                  const margin = c.monthlySpend > 0 ? ((profit / c.monthlySpend) * 100).toFixed(1) + '%' : '–';
                   return (
                     <tr key={c.id}>
                       <td className="py-2 px-3 font-sans font-bold text-slate-900 dark:text-slate-100">{c.companyName}</td>
@@ -226,7 +231,7 @@ export const ReportsView: React.FC = () => {
                       <td className="py-2 px-3 text-right tabular-nums font-bold text-slate-900 dark:text-slate-100">{formatINR(c.monthlySpend)}</td>
                       <td className="py-2 px-3 text-right tabular-nums text-rose-500">-{formatINR(c.monthlyCost)}</td>
                       <td className="py-2 px-3 text-right tabular-nums text-emerald-600 dark:text-emerald-400 font-bold">+{formatINR(profit)}</td>
-                      <td className="py-2 px-3 text-right tabular-nums text-cyan-600 dark:text-cyan-400 font-semibold">{c.marginPercent.toFixed(1)}%</td>
+                      <td className="py-2 px-3 text-right tabular-nums text-cyan-600 dark:text-cyan-400 font-semibold">{margin}</td>
                     </tr>
                   );
                 })}

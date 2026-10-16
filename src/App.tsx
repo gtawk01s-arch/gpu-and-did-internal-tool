@@ -28,12 +28,14 @@ import { DatabaseDesignView } from './components/views/DatabaseDesignView';
 import { BonusToolsView } from './components/views/BonusToolsView';
 import { XamppGuideView } from './components/views/XamppGuideView';
 
+import { AdminLoginView } from './components/auth/AdminLoginView';
+
 const AppContent: React.FC = () => {
-  const { activeTab, isClientPortalMode } = useApp();
+  const { activeTab, isClientPortalMode, authenticatedClient, isAdminLoggedIn, currentUser } = useApp();
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
-  // If in dedicated client portal mode (via direct client URL or launch), render standalone isolated portal
-  if (isClientPortalMode) {
+  // 1. HARD SECURITY ISOLATION: A client login must NEVER reach admin pages, even by changing the URL
+  if (authenticatedClient || isClientPortalMode) {
     return (
       <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors p-3 sm:p-6 lg:p-8">
         <div className="max-w-6xl mx-auto w-full">
@@ -41,6 +43,11 @@ const AppContent: React.FC = () => {
         </div>
       </div>
     );
+  }
+
+  // 2. ADMIN GATEWAY: Enforce login before viewing admin dashboards
+  if (!isAdminLoggedIn) {
+    return <AdminLoginView />;
   }
 
   const renderActiveView = () => {
@@ -75,7 +82,8 @@ const AppContent: React.FC = () => {
       case 'client-portal':
         return <ClientPortalView />;
       case 'database':
-        return <DatabaseDesignView />;
+        // Only accessible to Super Admin in read-only mode
+        return currentUser.role === 'Super Admin' ? <DatabaseDesignView /> : <DashboardView />;
       case 'bonus-tools':
         return <BonusToolsView />;
       case 'xampp':

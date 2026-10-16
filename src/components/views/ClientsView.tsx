@@ -92,7 +92,9 @@ export const ClientsView: React.FC = () => {
 
   const totalRevenue = clients.reduce((sum, c) => sum + c.monthlySpend, 0);
   const totalCost = clients.reduce((sum, c) => sum + c.monthlyCost, 0);
-  const overallMargin = Math.round(((totalRevenue - totalCost) / totalRevenue) * 100);
+  const overallProfit = totalRevenue - totalCost;
+  const overallMargin = totalRevenue > 0 ? Math.round((overallProfit / totalRevenue) * 100) : 0;
+  const totalUnbilledUsage = clients.reduce((sum, c) => sum + (c.unbilledUsage || 0), 0);
 
   const availableGpus = gpus.filter(g => g.quantity - g.allocatedQuantity > 0);
   const availableDids = dids.filter(d => d.status === 'Available');
@@ -161,7 +163,7 @@ export const ClientsView: React.FC = () => {
       allocatedDidCount: initDidAlloc,
       monthlySpend: initSpend,
       monthlyCost: initCost,
-      marginPercent: initSpend > 0 ? Math.round(((initSpend - initCost) / initSpend) * 100) : 34.5,
+      marginPercent: initSpend > 0 ? Math.round(((initSpend - initCost) / initSpend) * 100) : 0,
     });
 
     setShowCreateModal(false);
@@ -221,11 +223,12 @@ export const ClientsView: React.FC = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <MetricCard label="Total Client Accounts" value={clients.length} subValue="Active contracts" badge="Accounts" />
         <MetricCard label="Monthly Client Billing" value={formatINR(totalRevenue)} subValue="Gross Run-Rate" highlight badge="Revenue" />
         <MetricCard label="Wholesale Upstream Cost" value={formatINR(totalCost)} subValue="Provider Commitments" badge="Cost" />
-        <MetricCard label="Portfolio Spread Margin" value={`${overallMargin}%`} subValue={`+${formatINR(totalRevenue - totalCost)} Gross Spread`} badge="Margin" />
+        <MetricCard label="Net Resale Profit" value={`+${formatINR(overallProfit)}`} subValue={`${totalRevenue > 0 ? overallMargin + '%' : '–'} Margin`} badge="Profit" />
+        <MetricCard label="Total Unbilled Usage" value={totalUnbilledUsage > 0 ? formatINR(totalUnbilledUsage) : '₹0'} subValue="Pending Cycle" badge="Unbilled" />
       </div>
 
       {/* Dedicated Client Portal URLs & Access Banner */}
@@ -316,6 +319,8 @@ export const ClientsView: React.FC = () => {
                 <th className="py-2.5 px-3 text-right">Allocated GPUs</th>
                 <th className="py-2.5 px-3 text-right">Allocated DIDs</th>
                 <th className="py-2.5 px-3 text-right">Monthly Spend</th>
+                <th className="py-2.5 px-3 text-right">Profit / Margin</th>
+                <th className="py-2.5 px-3 text-right">Unbilled Usage</th>
                 <th className="py-2.5 px-3">Dedicated Portal URL</th>
                 <th className="py-2.5 px-3">Status</th>
                 <th className="py-2.5 px-3 text-right">Actions</th>
@@ -366,6 +371,33 @@ export const ClientsView: React.FC = () => {
                   </td>
                   <td className="py-2.5 px-3 text-right font-mono tabular-nums font-bold text-emerald-600 dark:text-emerald-400">
                     {formatINR(client.monthlySpend)}/mo
+                  </td>
+                  <td className="py-2.5 px-3 text-right font-mono tabular-nums">
+                    {(() => {
+                      const clientProfit = client.monthlySpend - client.monthlyCost;
+                      const clientMargin = client.monthlySpend > 0 ? ((clientProfit / client.monthlySpend) * 100).toFixed(1) : '0';
+                      return (
+                        <div>
+                          <div className="font-bold text-emerald-600 dark:text-emerald-400">
+                            +{formatINR(clientProfit)}/mo
+                          </div>
+                          <div className="text-[10px] text-slate-400">
+                            {client.monthlySpend > 0 ? `${clientMargin}% margin` : '–'}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </td>
+                  <td className="py-2.5 px-3 text-right font-mono tabular-nums">
+                    <div className="font-semibold text-slate-900 dark:text-slate-100">
+                      {client.unbilledUsage && client.unbilledUsage > 0 ? formatINR(client.unbilledUsage) : '₹0'}
+                    </div>
+                    {(client.unbilledGpuHours || client.unbilledSipMinutes) ? (
+                      <div className="text-[10px] text-slate-400">
+                        {client.unbilledGpuHours ? `${client.unbilledGpuHours}h GPU ` : ''}
+                        {client.unbilledSipMinutes ? `${client.unbilledSipMinutes}m SIP` : ''}
+                      </div>
+                    ) : null}
                   </td>
                   <td className="py-2.5 px-3">
                     <div className="flex items-center gap-1.5">

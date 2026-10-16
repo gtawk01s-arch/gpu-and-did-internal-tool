@@ -17,6 +17,7 @@ import {
   KeyRound,
   ShieldCheck,
   Code2,
+  AlertTriangle,
 } from 'lucide-react';
 
 export const XamppGuideView: React.FC = () => {

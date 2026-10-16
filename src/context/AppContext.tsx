@@ -15,6 +15,7 @@ import {
   SystemAlert,
   AuditLog,
   SupportTicket,
+  UserAccessPermissions,
 } from '../types';
 import {
   INITIAL_USERS,
@@ -31,11 +32,127 @@ import {
   INITIAL_AUDIT_LOGS,
   INITIAL_SUPPORT_TICKETS,
 } from '../data/mockData';
+import { hashPassword, verifyPassword } from '../utils/crypto';
+
+export const DEFAULT_PERMISSIONS_BY_ROLE: Record<UserRole, UserAccessPermissions> = {
+  'Super Admin': {
+    dashboard: true,
+    allocations: true,
+    gpus: true,
+    sips: true,
+    clients: true,
+    providers: true,
+    finance: true,
+    invoices: true,
+    payments: true,
+    alerts: true,
+    audit: true,
+    reports: true,
+    users: true,
+    database: true,
+    bonusTools: true,
+    xampp: true,
+  },
+  'Operations Manager': {
+    dashboard: true,
+    allocations: true,
+    gpus: true,
+    sips: true,
+    clients: true,
+    providers: true,
+    finance: false,
+    invoices: false,
+    payments: false,
+    alerts: true,
+    audit: true,
+    reports: true,
+    users: false,
+    database: false,
+    bonusTools: true,
+    xampp: false,
+  },
+  'Finance Manager': {
+    dashboard: true,
+    allocations: true,
+    gpus: false,
+    sips: false,
+    clients: true,
+    providers: true,
+    finance: true,
+    invoices: true,
+    payments: true,
+    alerts: true,
+    audit: true,
+    reports: true,
+    users: false,
+    database: false,
+    bonusTools: false,
+    xampp: false,
+  },
+  'Sales Manager': {
+    dashboard: true,
+    allocations: true,
+    gpus: false,
+    sips: false,
+    clients: true,
+    providers: false,
+    finance: true,
+    invoices: true,
+    payments: false,
+    alerts: false,
+    audit: false,
+    reports: true,
+    users: false,
+    database: false,
+    bonusTools: true,
+    xampp: false,
+  },
+  'Support Agent': {
+    dashboard: true,
+    allocations: false,
+    gpus: false,
+    sips: false,
+    clients: true,
+    providers: false,
+    finance: false,
+    invoices: false,
+    payments: false,
+    alerts: true,
+    audit: false,
+    reports: false,
+    users: false,
+    database: false,
+    bonusTools: false,
+    xampp: false,
+  },
+  'Client Portal User': {
+    dashboard: false,
+    allocations: false,
+    gpus: false,
+    sips: false,
+    clients: false,
+    providers: false,
+    finance: false,
+    invoices: false,
+    payments: false,
+    alerts: false,
+    audit: false,
+    reports: false,
+    users: false,
+    database: false,
+    bonusTools: false,
+    xampp: false,
+  },
+};
 
 interface AppContextType {
   currentUser: User;
   setCurrentUser: (user: User) => void;
   switchRole: (role: UserRole) => void;
+  isAdminLoggedIn: boolean;
+  adminLogin: (email: string, password: string) => { success: boolean; error?: string };
+  adminLogout: () => void;
+  calculatedResaleMargin: string;
   theme: 'dark' | 'light';
   toggleTheme: () => void;
   activeTab: string;
@@ -65,6 +182,8 @@ interface AppContextType {
   revokeApiKey: (keyId: string) => void;
   connectProviderApi: (providerId: string, endpoint: string, secretKey: string) => void;
   updateProviderCapacity: (providerId: string, updates: Partial<Provider>) => void;
+  updateProvider: (providerId: string, updates: Partial<Provider>) => void;
+  createProvider: (provider: Partial<Provider>) => void;
 
   allocateGpu: (id: string, clientName: string, quantity: number) => void;
   reclaimGpu: (id: string) => void;
@@ -78,7 +197,7 @@ interface AppContextType {
   importDidNumbers: (trunkId: string, numbersList: string[], monthlyCost?: number, sellingPrice?: number) => { added: number; skipped: number };
   approveRequest: (id: string) => void;
   rejectRequest: (id: string) => void;
-  holdRequest: (id: string) => void;
+  holdRequest: (id: string, reason?: string) => void;
   createRequest: (req: Partial<PendingRequest>) => void;
   createInvoice: (invoice: Partial<Invoice>) => void;
   markInvoicePaid: (id: string) => void;
@@ -96,8 +215,9 @@ interface AppContextType {
   acknowledgeAlert: (id: string) => void;
   resolveAlert: (id: string) => void;
   createAlert: (alert: Partial<SystemAlert>) => void;
-  createUser: (user: Partial<User>) => void;
+  createUser: (user: Partial<User>, initialPassword?: string, permissions?: UserAccessPermissions) => void;
   updateUser: (id: string, updates: Partial<User>) => void;
+  deleteUser: (userId: string) => { success: boolean; message: string };
   toggleUserStatus: (id: string) => void;
   createClient: (client: Partial<Client>) => void;
   updateClient: (id: string, updates: Partial<Client>) => void;
@@ -110,15 +230,17 @@ interface AppContextType {
   clearAllMockData: () => void;
   restoreDemoData: () => void;
 
-  // Dedicated Client URL & Portal Mode
+  // Dedicated Panel URLs & Portal Mode
   isClientPortalMode: boolean;
   setIsClientPortalMode: (mode: boolean) => void;
   targetClientIdFromUrl: string | null;
   setTargetClientIdFromUrl: (id: string | null) => void;
+  getAdminPanelUrl: () => string;
   getClientPortalUrl: (clientId?: string) => string;
   getClientShareMessage: (client: Client) => string;
   openClientPortal: (clientId: string, autoLogin?: boolean) => void;
   returnToBrokerAdmin: (targetTab?: string) => void;
+  navigateToAdminLogin: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -144,14 +266,25 @@ const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
   const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
   const [apiKeys, setApiKeys] = useState<CelerkoApiKey[]>([]);
 
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const stored = localStorage.getItem('celerko_admin_session');
+    if (stored === 'false') return false;
+    return true;
+  });
+
   const [authenticatedClient, setAuthenticatedClient] = useState<Client | null>(null);
 
-  // Parse initial URL parameters or hash for client portal
+  // Parse initial URL parameters or hash for client portal vs admin panel
   const [isClientPortalMode, setIsClientPortalMode] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     const params = new URLSearchParams(window.location.search);
     const hash = window.location.hash || '';
+    if (params.get('panel') === 'admin' || hash === '#admin') {
+      return false;
+    }
     return (
+      params.get('panel') === 'client' ||
       params.get('portal') === 'client' ||
       params.get('view') === 'client-portal' ||
       params.get('tab') === 'client-portal' ||
@@ -175,18 +308,69 @@ const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
     return null;
   });
 
+  // Calculate real-time wholesale margin dynamically - no fixed text
+  const calculatedResaleMargin = (() => {
+    const gpuRev = gpus.reduce((sum, g) => sum + (g.sellingPrice * g.allocatedQuantity), 0);
+    const assigned = dids.filter(d => d.status === 'Assigned');
+    const didRev = assigned.reduce((sum, d) => sum + d.sellingPrice, 0);
+    const trunksCost = sipProviders.reduce((sum, p) => sum + p.monthlyCost, 0);
+    const trunksRev = Math.round(trunksCost * 1.55);
+    const totRev = gpuRev + didRev + trunksRev;
+    const gpuC = gpus.reduce((sum, g) => sum + (g.monthlyCost * g.allocatedQuantity), 0);
+    const didC = assigned.reduce((sum, d) => sum + d.monthlyCost, 0);
+    const totCost = gpuC + didC + trunksCost;
+    const profit = totRev - totCost;
+    return totRev > 0 ? ((profit / totRev) * 100).toFixed(1) + '%' : '–';
+  })();
+
+  const adminLogin = (email: string, password: string): { success: boolean; error?: string } => {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPass = password.trim();
+    const matched = users.find(u => u.email.toLowerCase() === cleanEmail);
+    if (!matched) {
+      return { success: false, error: 'User account not found with this email address.' };
+    }
+    if (matched.status !== 'Active') {
+      return { success: false, error: 'This administrative account is disabled.' };
+    }
+    if (!verifyPassword(cleanPass, matched.passwordHash)) {
+      return { success: false, error: 'Invalid password. Please check your credentials.' };
+    }
+    setCurrentUser(matched);
+    setIsAdminLoggedIn(true);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('celerko_admin_session', 'true');
+    }
+    addAuditLog('User Login', 'Admin Gateway', `Admin authenticated: ${matched.name} (${matched.role})`);
+    return { success: true };
+  };
+
+  const adminLogout = () => {
+    setIsAdminLoggedIn(false);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('celerko_admin_session', 'false');
+    }
+    addAuditLog('User Login', 'Admin Gateway', `Admin logged out: ${currentUser.name}`);
+  };
+
+  const getAdminPanelUrl = (): string => {
+    if (typeof window === 'undefined') return '';
+    const origin = window.location.origin;
+    const pathname = window.location.pathname;
+    return `${origin}${pathname}?panel=admin`;
+  };
+
   const getClientPortalUrl = (clientId?: string): string => {
     if (typeof window === 'undefined') return '';
     const origin = window.location.origin;
     const pathname = window.location.pathname;
-    const query = clientId ? `?portal=client&clientId=${encodeURIComponent(clientId)}` : '?portal=client';
+    const query = clientId ? `?panel=client&clientId=${encodeURIComponent(clientId)}` : '?panel=client';
     return `${origin}${pathname}${query}`;
   };
 
   const getClientShareMessage = (client: Client): string => {
     const url = getClientPortalUrl(client.id);
     const username = client.portalUsername || client.email;
-    const password = client.portalPassword || 'HyperScale@2026';
     return `================================================
 INFRASTRUCTURE CLIENT PORTAL ACCESS
 Account: ${client.companyName}
@@ -197,7 +381,7 @@ ${url}
 
 Your Login Credentials:
 • Username / Email: ${username}
-• Password: ${password}
+• Security: Passwords are protected via SHA-256 cryptographic hashing.
 
 Self-Service Features:
 • Raise GPU Cluster Capacity Requests (NVIDIA H100, A100, B200, L40S)
@@ -224,17 +408,42 @@ Please save and bookmark your dedicated URL for instant access.
     }
   };
 
+  // Cleanly navigate to Admin Panel Login / Dashboard from Client Portal
   const returnToBrokerAdmin = (targetTab: string = 'clients') => {
+    setAuthenticatedClient(null);
     setIsClientPortalMode(false);
     setActiveTab(targetTab);
     if (typeof window !== 'undefined') {
-      window.history.pushState({ mode: 'admin' }, '', window.location.pathname);
+      window.history.pushState({ mode: 'admin' }, '', getAdminPanelUrl());
     }
   };
 
-  // Sync state on popstate (browser back/forward navigation)
+  const navigateToAdminLogin = () => {
+    setAuthenticatedClient(null);
+    setIsClientPortalMode(false);
+    setActiveTab('dashboard');
+    if (typeof window !== 'undefined') {
+      window.history.pushState({ mode: 'admin' }, '', getAdminPanelUrl());
+    }
+  };
+
+  // Enforce client quarantine: whenever a client is logged in, they CANNOT leave client portal
+  useEffect(() => {
+    if (authenticatedClient) {
+      setIsClientPortalMode(true);
+      setActiveTab('client-portal');
+    }
+  }, [authenticatedClient, activeTab, isClientPortalMode]);
+
+  // Sync state on popstate (browser back/forward navigation) with client protection
   useEffect(() => {
     const handlePopState = () => {
+      if (authenticatedClient) {
+        // Locked into client portal
+        setIsClientPortalMode(true);
+        setActiveTab('client-portal');
+        return;
+      }
       const params = new URLSearchParams(window.location.search);
       const isClient =
         params.get('portal') === 'client' ||
@@ -249,7 +458,7 @@ Please save and bookmark your dedicated URL for instant access.
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  }, [authenticatedClient]);
 
   const clientLogin = (usernameOrEmail: string, password: string): { success: boolean; error?: string } => {
     const cleanUser = usernameOrEmail.trim().toLowerCase();
@@ -258,7 +467,8 @@ Please save and bookmark your dedicated URL for instant access.
     const matched = clients.find(c => {
       const emailMatches = c.email.toLowerCase() === cleanUser;
       const usernameMatches = c.portalUsername?.toLowerCase() === cleanUser;
-      return (emailMatches || usernameMatches) && c.portalPassword === cleanPass;
+      const passMatches = verifyPassword(cleanPass, c.portalPasswordHash) || (c.portalPassword && c.portalPassword === cleanPass);
+      return (emailMatches || usernameMatches) && passMatches;
     });
 
     if (matched) {
@@ -266,6 +476,8 @@ Please save and bookmark your dedicated URL for instant access.
         return { success: false, error: 'This client account is suspended. Please contact wholesale operations.' };
       }
       setAuthenticatedClient(matched);
+      setIsClientPortalMode(true);
+      setActiveTab('client-portal');
       addAuditLog(
         'User Login',
         'Client Gateway',
@@ -288,21 +500,22 @@ Please save and bookmark your dedicated URL for instant access.
   };
 
   const updateClientCredentials = (clientId: string, username: string, password: string) => {
+    const hashed = hashPassword(password);
     setClients(prev =>
       prev.map(c => {
         if (c.id === clientId) {
           addAuditLog(
             'System Configuration',
             `Credentials for ${c.companyName}`,
-            `Updated client portal access credentials`
+            `Updated client portal access credentials (Stored as SHA-256 hash)`
           );
-          return { ...c, portalUsername: username, portalPassword: password };
+          return { ...c, portalUsername: username, portalPasswordHash: hashed, portalPassword: undefined };
         }
         return c;
       })
     );
     if (authenticatedClient && authenticatedClient.id === clientId) {
-      setAuthenticatedClient(prev => (prev ? { ...prev, portalUsername: username, portalPassword: password } : null));
+      setAuthenticatedClient(prev => (prev ? { ...prev, portalUsername: username, portalPasswordHash: hashed, portalPassword: undefined } : null));
     }
   };
 
@@ -691,12 +904,13 @@ Please save and bookmark your dedicated URL for instant access.
     );
   };
 
-  const holdRequest = (id: string) => {
+  const holdRequest = (id: string, reason?: string) => {
+    const finalReason = reason && reason.trim() ? reason.trim() : 'Under executive credit & technical review';
     setPendingRequests(prev =>
       prev.map(req => {
         if (req.id === id) {
-          addAuditLog('Approval Updated', `Status: ${req.status}`, 'Status: Hold', req.requestId);
-          return { ...req, status: 'Hold' };
+          addAuditLog('Approval Updated', `Status: ${req.status}`, `Status: Hold (Reason: ${finalReason})`, req.requestId);
+          return { ...req, status: 'Hold', holdReason: finalReason };
         }
         return req;
       })
@@ -940,12 +1154,17 @@ Please save and bookmark your dedicated URL for instant access.
       };
     }
 
+    const hashed = hashPassword(newPass);
+    setUsers(prev =>
+      prev.map(u => (u.id === userId ? { ...u, passwordHash: hashed } : u))
+    );
+
     addAuditLog(
       'System Configuration',
       `User ${targetUser.email}`,
-      `Admin ${currentUser.name} updated account password`
+      `Admin ${currentUser.name} updated account password (stored securely as SHA-256 hash)`
     );
-    return { success: true, message: `Password for ${targetUser.email} has been updated successfully.` };
+    return { success: true, message: `Password for ${targetUser.email} has been updated and securely hashed.` };
   };
 
   const pingProviderApi = (providerId: string) => {
@@ -1051,9 +1270,38 @@ Please save and bookmark your dedicated URL for instant access.
         return p;
       })
     );
+  const updateProvider = (providerId: string, updates: Partial<Provider>) => {
+    updateProviderCapacity(providerId, updates);
+    const target = providers.find(p => p.id === providerId);
+    addAuditLog('Provider Changes', target?.name || providerId, `Updated provider contract/API: End Date: ${updates.contractEnd || 'unchanged'}, Status: ${updates.apiStatus || 'unchanged'}`, providerId);
   };
 
-  const clearAllMockData = () => {
+  const createProvider = (providerData: Partial<Provider>) => {
+    const newProv: Provider = {
+      id: `prov-${Date.now()}`,
+      name: providerData.name || 'New Wholesale Provider',
+      providerType: providerData.providerType || 'GPU Cloud Provider',
+      serviceType: providerData.serviceType || 'Wholesale GPU Compute',
+      contractStart: providerData.contractStart || new Date().toISOString().substring(0, 10),
+      contractEnd: providerData.contractEnd || '2027-12-31',
+      monthlyCommitment: providerData.monthlyCommitment || 1500000,
+      apiStatus: providerData.apiStatus || 'Operational',
+      uptime90d: providerData.uptime90d || 99.98,
+      apiLatencyMs: providerData.apiLatencyMs || 45,
+      contactEmail: providerData.contactEmail || 'noc@provider.cloud',
+      apiEndpoint: providerData.apiEndpoint || 'https://api.upstream.cloud/v1',
+      upstreamKeyMasked: providerData.upstreamKeyMasked || 'sk_live_••••••••8821',
+      purchasedGpuCount: providerData.purchasedGpuCount || 16,
+      allocatedResourcesCount: providerData.allocatedResourcesCount || 0,
+      runningGpuCount: providerData.runningGpuCount || 0,
+      availableGpuCount: providerData.purchasedGpuCount || 16,
+      purchasedGpuModel: providerData.purchasedGpuModel || 'NVIDIA H100 SXM5 80GB',
+      lastHeartbeat: new Date().toISOString().replace('T', ' ').substring(0, 16) + ' UTC',
+      ...providerData,
+    };
+    setProviders(prev => [...prev, newProv]);
+    addAuditLog('Provider Changes', 'None', `Added wholesale provider ${newProv.name} with Contract End: ${newProv.contractEnd}, API Status: ${newProv.apiStatus}`, newProv.id);
+  };
     setGpus([]);
     setDids([]);
     setClients([]);
@@ -1194,17 +1442,21 @@ Please save and bookmark your dedicated URL for instant access.
     setAlerts(prev => [newAlert, ...prev]);
   };
 
-  const createUser = (user: Partial<User>) => {
+  const createUser = (user: Partial<User>, initialPassword?: string, permissions?: UserAccessPermissions) => {
+    const defaultPassword = initialPassword || 'User@2026';
+    const role = user.role || 'Operations Manager';
     const newUser: User = {
       id: `usr-${Date.now()}`,
       name: user.name || 'New Team Member',
       email: user.email || 'user@aethervox.cloud',
-      role: user.role || 'Operations Manager',
-      status: 'Active',
+      role: role,
+      status: user.status || 'Active',
       lastLogin: 'Never',
-      lastIp: '0.0.0.0',
+      lastIp: '—',
       activeSessions: 0,
       createdAt: new Date().toISOString().split('T')[0],
+      passwordHash: user.passwordHash || hashPassword(defaultPassword),
+      permissions: permissions || DEFAULT_PERMISSIONS_BY_ROLE[role] || DEFAULT_PERMISSIONS_BY_ROLE['Operations Manager'],
     };
     setUsers(prev => [...prev, newUser]);
     addAuditLog('System Configuration', 'None', `Created user account ${newUser.email} (${newUser.role})`);
@@ -1215,12 +1467,26 @@ Please save and bookmark your dedicated URL for instant access.
       prev.map(u => {
         if (u.id === id) {
           const updated = { ...u, ...updates };
-          addAuditLog('System Configuration', `User: ${u.email}`, `Updated profile for ${updated.email}`);
+          addAuditLog('System Configuration', `User: ${u.email}`, `Updated profile & access permissions for ${updated.email}`);
           return updated;
         }
         return u;
       })
     );
+    if (currentUser.id === id) {
+      setCurrentUser(prev => ({ ...prev, ...updates }));
+    }
+  };
+
+  const deleteUser = (userId: string): { success: boolean; message: string } => {
+    const target = users.find(u => u.id === userId);
+    if (!target) return { success: false, message: 'User account not found.' };
+    if (target.role === 'Super Admin' || target.id === 'usr-1') {
+      return { success: false, message: 'Security Policy: Primary Super Administrator account cannot be deleted.' };
+    }
+    setUsers(prev => prev.filter(u => u.id !== userId));
+    addAuditLog('System Configuration', `User: ${target.email}`, `Super Admin deleted user: ${target.name} (${target.email})`);
+    return { success: true, message: `User ${target.name} has been deleted successfully.` };
   };
 
   const toggleUserStatus = (id: string) => {
@@ -1238,6 +1504,7 @@ Please save and bookmark your dedicated URL for instant access.
 
   const createClient = (c: Partial<Client>) => {
     const count = clients.length + 1;
+    const initialPass = c.portalPassword || `${(c.companyName || 'Client').replace(/[^a-zA-Z0-9]/g, '') || 'Client'}@2026`;
     const newClient: Client = {
       id: `clt-00${count}`,
       companyName: c.companyName || 'New Client Corp',
@@ -1247,7 +1514,7 @@ Please save and bookmark your dedicated URL for instant access.
       address: c.address || '100 Enterprise Way, Suite 200',
       status: 'Active',
       portalUsername: c.portalUsername || c.email || 'client@enterprise.com',
-      portalPassword: c.portalPassword || `${(c.companyName || 'Client').replace(/[^a-zA-Z0-9]/g, '')}@2026`,
+      portalPasswordHash: hashPassword(initialPass),
       resourceRequirement: c.resourceRequirement || 'Both GPU & DID',
       gpuNeededModel: c.gpuNeededModel,
       gpuNeededQuantity: c.gpuNeededQuantity,
@@ -1259,6 +1526,9 @@ Please save and bookmark your dedicated URL for instant access.
       monthlySpend: c.monthlySpend || 0,
       monthlyCost: c.monthlyCost || 0,
       marginPercent: c.marginPercent || 35.0,
+      unbilledUsage: c.unbilledUsage || 0,
+      unbilledGpuHours: c.unbilledGpuHours || 0,
+      unbilledSipMinutes: c.unbilledSipMinutes || 0,
       joinedDate: new Date().toISOString().split('T')[0],
     };
     setClients(prev => [...prev, newClient]);
@@ -1288,6 +1558,10 @@ Please save and bookmark your dedicated URL for instant access.
         currentUser,
         setCurrentUser,
         switchRole,
+        isAdminLoggedIn,
+        adminLogin,
+        adminLogout,
+        calculatedResaleMargin,
         theme,
         toggleTheme,
         activeTab,
@@ -1345,6 +1619,7 @@ Please save and bookmark your dedicated URL for instant access.
         createAlert,
         createUser,
         updateUser,
+        deleteUser,
         toggleUserStatus,
         createClient,
         updateClient,
@@ -1360,10 +1635,12 @@ Please save and bookmark your dedicated URL for instant access.
         setIsClientPortalMode,
         targetClientIdFromUrl,
         setTargetClientIdFromUrl,
+        getAdminPanelUrl,
         getClientPortalUrl,
         getClientShareMessage,
         openClientPortal,
         returnToBrokerAdmin,
+        navigateToAdminLogin,
       }}
     >
       {children}
