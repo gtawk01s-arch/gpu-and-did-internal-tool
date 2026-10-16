@@ -182,8 +182,6 @@ interface AppContextType {
   revokeApiKey: (keyId: string) => void;
   connectProviderApi: (providerId: string, endpoint: string, secretKey: string) => void;
   updateProviderCapacity: (providerId: string, updates: Partial<Provider>) => void;
-  updateProvider: (providerId: string, updates: Partial<Provider>) => void;
-  createProvider: (provider: Partial<Provider>) => void;
 
   allocateGpu: (id: string, clientName: string, quantity: number) => void;
   reclaimGpu: (id: string) => void;
@@ -1270,38 +1268,9 @@ Please save and bookmark your dedicated URL for instant access.
         return p;
       })
     );
-  const updateProvider = (providerId: string, updates: Partial<Provider>) => {
-    updateProviderCapacity(providerId, updates);
-    const target = providers.find(p => p.id === providerId);
-    addAuditLog('Provider Changes', target?.name || providerId, `Updated provider contract/API: End Date: ${updates.contractEnd || 'unchanged'}, Status: ${updates.apiStatus || 'unchanged'}`, providerId);
   };
 
-  const createProvider = (providerData: Partial<Provider>) => {
-    const newProv: Provider = {
-      id: `prov-${Date.now()}`,
-      name: providerData.name || 'New Wholesale Provider',
-      providerType: providerData.providerType || 'GPU Cloud Provider',
-      serviceType: providerData.serviceType || 'Wholesale GPU Compute',
-      contractStart: providerData.contractStart || new Date().toISOString().substring(0, 10),
-      contractEnd: providerData.contractEnd || '2027-12-31',
-      monthlyCommitment: providerData.monthlyCommitment || 1500000,
-      apiStatus: providerData.apiStatus || 'Operational',
-      uptime90d: providerData.uptime90d || 99.98,
-      apiLatencyMs: providerData.apiLatencyMs || 45,
-      contactEmail: providerData.contactEmail || 'noc@provider.cloud',
-      apiEndpoint: providerData.apiEndpoint || 'https://api.upstream.cloud/v1',
-      upstreamKeyMasked: providerData.upstreamKeyMasked || 'sk_live_••••••••8821',
-      purchasedGpuCount: providerData.purchasedGpuCount || 16,
-      allocatedResourcesCount: providerData.allocatedResourcesCount || 0,
-      runningGpuCount: providerData.runningGpuCount || 0,
-      availableGpuCount: providerData.purchasedGpuCount || 16,
-      purchasedGpuModel: providerData.purchasedGpuModel || 'NVIDIA H100 SXM5 80GB',
-      lastHeartbeat: new Date().toISOString().replace('T', ' ').substring(0, 16) + ' UTC',
-      ...providerData,
-    };
-    setProviders(prev => [...prev, newProv]);
-    addAuditLog('Provider Changes', 'None', `Added wholesale provider ${newProv.name} with Contract End: ${newProv.contractEnd}, API Status: ${newProv.apiStatus}`, newProv.id);
-  };
+  const clearAllMockData = () => {
     setGpus([]);
     setDids([]);
     setClients([]);
