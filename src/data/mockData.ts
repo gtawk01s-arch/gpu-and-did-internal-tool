@@ -203,6 +203,28 @@ export const INITIAL_GPU_INVENTORY: GpuInventoryItem[] = [
     assignedClient: 'HyperScale AI India Pvt Ltd',
     powerDrawWatts: 1000,
   },
+  {
+    id: 'gpu-node-07',
+    gpuId: 'GPU-H100-DEL-H1',
+    provider: 'CoreWeave',
+    region: 'Delhi NCR (CtrlS DC)',
+    gpuModel: 'NVIDIA H100 SXM5 80GB',
+    quantity: 16,
+    allocatedQuantity: 16,
+    monthlyCost: 185000,
+    sellingPrice: 280000,
+    marginPercent: 33.93,
+    contractStart: '2026-03-01',
+    contractEnd: '2027-02-28',
+    status: 'Hold',
+    holdReason: 'Client billing audit & scheduled switch port maintenance (Net-30 payment review)',
+    heldAt: '2026-10-14 11:20 UTC',
+    heldBy: 'Marcus Vance',
+    vramGb: 80,
+    interconnect: 'Infiniband NDR 400Gbps',
+    assignedClient: 'AnthroTech Labs',
+    powerDrawWatts: 700,
+  },
 ];
 
 export const INITIAL_SIP_PROVIDERS: SipProvider[] = [

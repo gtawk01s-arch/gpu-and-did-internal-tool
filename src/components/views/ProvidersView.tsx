@@ -26,8 +26,9 @@ import { Provider } from '../../types';
 import { formatINR } from '../../data/mockData';
 
 export const ProvidersView: React.FC = () => {
-  const { providers, createAlert, pingProviderApi, connectProviderApi, updateProviderCapacity } = useApp();
+  const { providers, createAlert, pingProviderApi, connectProviderApi, updateProviderCapacity, updateProvider } = useApp();
   const [selectedType, setSelectedType] = useState<'All GPU Clouds' | 'Hyperscale GPU Clouds' | 'Bare-Metal AI Datacenters' | 'Specialized AI Clouds'>('All GPU Clouds');
+  const [activeViewMode, setActiveViewMode] = useState<'contracts-matrix' | 'fleet-cards'>('contracts-matrix');
   const [pingingId, setPingingId] = useState<string | null>(null);
 
   // Modal states
@@ -41,6 +42,14 @@ export const ProvidersView: React.FC = () => {
   const [editPurchased, setEditPurchased] = useState<number>(0);
   const [editAllocated, setEditAllocated] = useState<number>(0);
   const [editRunning, setEditRunning] = useState<number>(0);
+
+  // Contract End Dates & API Status Modal State
+  const [showContractModal, setShowContractModal] = useState(false);
+  const [selectedProviderForContract, setSelectedProviderForContract] = useState<Provider | null>(null);
+  const [editContractStart, setEditContractStart] = useState('');
+  const [editContractEnd, setEditContractEnd] = useState('');
+  const [editApiStatus, setEditApiStatus] = useState<'Operational' | 'Degraded' | 'Offline'>('Operational');
+  const [editMonthlyCommitment, setEditMonthlyCommitment] = useState<number>(0);
 
   // Wholesale GPU Aggregates (Strictly GPU Providers Only)
   const totalCommitment = providers.reduce((sum, p) => sum + p.monthlyCommitment, 0);
@@ -129,6 +138,31 @@ export const ProvidersView: React.FC = () => {
     }
   };
 
+  const openContractDialog = (provider: Provider) => {
+    setSelectedProviderForContract(provider);
+    setEditContractStart(provider.contractStart);
+    setEditContractEnd(provider.contractEnd);
+    setEditApiStatus(provider.apiStatus);
+    setEditMonthlyCommitment(provider.monthlyCommitment);
+    setShowContractModal(true);
+  };
+
+  const handleSaveContract = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedProviderForContract && editContractEnd) {
+      updateProvider(selectedProviderForContract.id, {
+        contractStart: editContractStart,
+        contractEnd: editContractEnd,
+        apiStatus: editApiStatus,
+        monthlyCommitment: Number(editMonthlyCommitment),
+      });
+      setShowContractModal(false);
+    }
+  };
+
+  const nearestExpiring = [...providers].sort((a, b) => getDaysRemaining(a.contractEnd) - getDaysRemaining(b.contractEnd))[0];
+  const operationalApisCount = providers.filter(p => p.apiStatus === 'Operational').length;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -174,8 +208,8 @@ export const ProvidersView: React.FC = () => {
         </div>
       </div>
 
-      {/* Celerko Capacity Manager KPI Cards (Strictly GPU Metrics) */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      {/* Celerko Capacity & Provider Health KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
         <MetricCard
           label="Total Purchased GPUs"
           value={`${totalGpusPurchased} Nodes`}
@@ -190,16 +224,22 @@ export const ProvidersView: React.FC = () => {
           badge="Allocated"
         />
         <MetricCard
-          label="Running Workloads"
-          value={`${totalGpusRunning} Active`}
-          subValue="Live GPU compute tasks"
-          badge="Running"
-        />
-        <MetricCard
           label="Available / Free GPUs"
           value={`${totalGpusAvailable} Nodes`}
           subValue="Ready for new allocation"
           badge="Available"
+        />
+        <MetricCard
+          label="API Status Online"
+          value={`${operationalApisCount}/${providers.length}`}
+          subValue={`${avgUptime}% SLA Uptime`}
+          badge="API Health"
+        />
+        <MetricCard
+          label="Nearest Contract End"
+          value={nearestExpiring ? nearestExpiring.contractEnd : '–'}
+          subValue={nearestExpiring ? `${nearestExpiring.name.split(' ')[0]} (${getDaysRemaining(nearestExpiring.contractEnd)}d left)` : '–'}
+          badge="Renewal"
         />
         <MetricCard
           label="Monthly Commitment"
@@ -209,16 +249,41 @@ export const ProvidersView: React.FC = () => {
         />
       </div>
 
-      {/* Filter Tabs - Exclusively GPU Cloud Categories */}
-      <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2 text-xs overflow-x-auto gap-2">
-        <div className="flex items-center gap-2">
+      {/* View Switcher: Contracts & API Status Table vs Fleet Cards */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3 rounded-lg border border-slate-200 dark:border-slate-800 text-xs">
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-lg">
+          <button
+            onClick={() => setActiveViewMode('contracts-matrix')}
+            className={`px-3 py-1.5 rounded-md font-medium transition-all flex items-center gap-1.5 ${
+              activeViewMode === 'contracts-matrix'
+                ? 'bg-white dark:bg-slate-700 text-cyan-600 dark:text-cyan-400 font-bold shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+            }`}
+          >
+            <Calendar className="w-3.5 h-3.5 text-cyan-500" />
+            <span>Contract End Dates &amp; API Status Matrix</span>
+          </button>
+          <button
+            onClick={() => setActiveViewMode('fleet-cards')}
+            className={`px-3 py-1.5 rounded-md font-medium transition-all flex items-center gap-1.5 ${
+              activeViewMode === 'fleet-cards'
+                ? 'bg-white dark:bg-slate-700 text-cyan-600 dark:text-cyan-400 font-bold shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5 text-indigo-500" />
+            <span>Fleet &amp; Capacity Cards</span>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2 overflow-x-auto">
           {(['All GPU Clouds', 'Hyperscale GPU Clouds', 'Bare-Metal AI Datacenters', 'Specialized AI Clouds'] as const).map(type => (
             <button
               key={type}
               onClick={() => setSelectedType(type)}
-              className={`px-3 py-1.5 rounded font-medium transition-colors whitespace-nowrap ${
+              className={`px-2.5 py-1 rounded font-medium transition-colors whitespace-nowrap text-[11px] ${
                 selectedType === type
-                  ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 font-semibold shadow-xs'
+                  ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 font-semibold'
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
             >
@@ -226,203 +291,355 @@ export const ProvidersView: React.FC = () => {
             </button>
           ))}
         </div>
-        <span className="text-[11px] text-slate-400 font-mono hidden md:inline">
-          Showing {filteredProviders.length} Wholesale GPU Partners
-        </span>
       </div>
 
-      {/* Providers Grid (Strictly GPU Clouds with API Connector & Capacity Details) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
-        {filteredProviders.map(provider => {
-          const daysLeft = getDaysRemaining(provider.contractEnd);
-          const isExpiringSoon = daysLeft <= 60;
-          const isPinging = pingingId === provider.id;
-          const availableUnits = Math.max(0, (provider.purchasedGpuCount || 0) - (provider.allocatedResourcesCount || 0));
-
-          return (
-            <div
-              key={provider.id}
-              className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col justify-between shadow-xs transition-all hover:border-cyan-500/50"
-            >
-              <div>
-                {/* Top Row: Provider Brand & API Status */}
-                <div className="flex items-start justify-between gap-2 mb-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                        {provider.name}
-                      </h3>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-100 dark:bg-cyan-950 text-cyan-800 dark:text-cyan-300 font-semibold border border-cyan-200 dark:border-cyan-800">
-                        {provider.providerType}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      {provider.serviceType}
-                    </p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1 shrink-0">
-                    <StatusBadge status={provider.apiStatus} />
-                    <span className="text-[10px] font-mono text-slate-400">
-                      {provider.apiLatencyMs}ms (P99)
-                    </span>
-                  </div>
-                </div>
-
-                {/* Celerko Capacity Manager Section */}
-                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700/80 mb-3 space-y-2 text-xs font-mono">
-                  <div className="flex items-center justify-between pb-1.5 border-b border-slate-200 dark:border-slate-700/60 font-sans">
-                    <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs flex items-center gap-1.5">
-                      <Server className="w-3.5 h-3.5 text-cyan-500" />
-                      <span>Capacity Manager ({provider.purchasedGpuModel})</span>
-                    </span>
-                    <button
-                      onClick={() => openCapacityDialog(provider)}
-                      className="text-[11px] text-cyan-600 dark:text-cyan-400 hover:underline font-semibold flex items-center gap-1"
-                    >
-                      <Sliders className="w-3 h-3" />
-                      <span>Adjust Pool</span>
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-4 gap-2 text-center pt-0.5">
-                    <div className="p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
-                      <div className="text-[10px] text-slate-400 font-sans">Purchased</div>
-                      <div className="text-sm font-bold text-slate-900 dark:text-slate-100 font-mono">
-                        {provider.purchasedGpuCount}
-                      </div>
-                    </div>
-                    <div className="p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
-                      <div className="text-[10px] text-slate-400 font-sans">Allocated</div>
-                      <div className="text-sm font-bold text-amber-600 dark:text-amber-400 font-mono">
-                        {provider.allocatedResourcesCount}
-                      </div>
-                    </div>
-                    <div className="p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
-                      <div className="text-[10px] text-slate-400 font-sans">Running</div>
-                      <div className="text-sm font-bold text-blue-600 dark:text-blue-400 font-mono">
-                        {provider.runningGpuCount}
-                      </div>
-                    </div>
-                    <div className="p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
-                      <div className="text-[10px] text-slate-400 font-sans">Available</div>
-                      <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400 font-mono">
-                        {availableUnits}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-center pt-1.5 border-t border-slate-200 dark:border-slate-700/60 font-sans">
-                    <span className="text-slate-500 font-medium text-[11px]">Wholesale Commitment:</span>
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono text-xs">
-                      {formatINR(provider.monthlyCommitment)}/mo
-                    </span>
-                  </div>
-                </div>
-
-                {/* Celerko Provider API Connector Details */}
-                <div className="p-3 bg-slate-900/90 text-slate-200 rounded-lg border border-slate-700 mb-3 space-y-1.5 text-xs font-mono">
-                  <div className="flex items-center justify-between text-[11px] pb-1 border-b border-slate-700">
-                    <span className="text-cyan-400 font-sans font-semibold flex items-center gap-1.5">
-                      <KeyRound className="w-3 h-3 text-cyan-400" />
-                      <span>Provider API Connector</span>
-                    </span>
-                    <span className="text-[10px] text-emerald-400 bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-800">
-                      Backend Sync Active
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between text-[11px] items-center">
-                    <span className="text-slate-400 font-sans">Endpoint:</span>
-                    <span className="text-cyan-300 truncate max-w-[210px]">{provider.apiEndpoint || 'https://api.upstream.gpu/v1'}</span>
-                  </div>
-
-                  <div className="flex justify-between text-[11px] items-center">
-                    <span className="text-slate-400 font-sans flex items-center gap-1">
-                      <Lock className="w-3 h-3 text-amber-400" />
-                      <span>Upstream Secret Key:</span>
-                    </span>
-                    <span className="text-amber-300 font-bold">{provider.upstreamKeyMasked || 'sk_live_••••••••9a21'}</span>
-                  </div>
-
-                  <div className="flex justify-between text-[10px] text-slate-400 pt-1">
-                    <span>Client Exposure:</span>
-                    <span className="text-rose-400 font-semibold font-sans">Zero (Strictly Masked &amp; Hidden)</span>
-                  </div>
-                </div>
-
-                {/* Contract Dates & Agreement Term */}
-                <div className="space-y-1.5 text-xs font-mono text-[11px] mb-4">
-                  <div className="flex items-center justify-between p-2 rounded bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/50">
-                    <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-sans">
-                      <Calendar className="w-3.5 h-3.5 text-amber-500" />
-                      <span>Contract End Date:</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900 dark:text-slate-100">
-                        {provider.contractEnd}
-                      </span>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        daysLeft <= 30
-                          ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
-                          : daysLeft <= 60
-                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                          : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                      }`}>
-                        {daysLeft > 0 ? `${daysLeft} days left` : 'Expired'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between text-slate-500 px-1">
-                    <span>90-Day SLA Uptime:</span>
-                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">{provider.uptime90d}%</span>
-                  </div>
-                  <div className="flex justify-between text-slate-500 px-1">
-                    <span>Last Automated Heartbeat:</span>
-                    <span className="text-slate-600 dark:text-slate-300">{provider.lastHeartbeat || 'Operational'}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Bottom Actions */}
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs gap-2">
-                <span className="text-slate-400 text-[11px] truncate">{provider.contactEmail}</span>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => openConnectDialog(provider)}
-                    className="px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800 rounded-md transition-colors flex items-center gap-1"
-                    title="Configure Provider API Connector"
-                  >
-                    <KeyRound className="w-3 h-3" />
-                    <span>API Config</span>
-                  </button>
-
-                  <button
-                    onClick={() => handlePing(provider.id)}
-                    disabled={isPinging}
-                    className="px-2.5 py-1 text-[11px] font-semibold text-cyan-700 dark:text-cyan-300 bg-cyan-50 dark:bg-cyan-950/40 hover:bg-cyan-100 dark:hover:bg-cyan-900/60 border border-cyan-200 dark:border-cyan-800 rounded-md transition-colors flex items-center gap-1"
-                    title="Probe API Endpoint and Test Latency"
-                  >
-                    <RefreshCw className={`w-3 h-3 ${isPinging ? 'animate-spin text-cyan-600' : ''}`} />
-                    <span>{isPinging ? 'Probing...' : 'Ping API'}</span>
-                  </button>
-
-                  {isExpiringSoon && (
-                    <button
-                      onClick={() => handleTriggerContractAlert(provider)}
-                      className="px-2 py-1 text-[11px] font-semibold text-amber-800 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950 dark:text-amber-300 rounded-md transition-colors"
-                      title="Set Expiration Warning Alert"
-                    >
-                      Warning
-                    </button>
-                  )}
-                </div>
-              </div>
+      {/* Main Content: Contracts Matrix vs Fleet Cards */}
+      {activeViewMode === 'contracts-matrix' ? (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
+          <div className="p-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-cyan-500" />
+                <span>Upstream Provider Contract End Dates &amp; Live API Status</span>
+              </h3>
+              <p className="text-[11px] text-slate-500">
+                Track wholesale agreement renewals, countdown to expiration, P99 API response latencies, and gateway connectivity.
+              </p>
             </div>
-          );
-        })}
-      </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-mono text-slate-400">
+                {filteredProviders.length} Partners Monitored
+              </span>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-400 font-medium">
+                  <th className="py-2.5 px-3">Provider &amp; Datacenter</th>
+                  <th className="py-2.5 px-3">GPU Architecture &amp; Model</th>
+                  <th className="py-2.5 px-3 text-right">Commitment</th>
+                  <th className="py-2.5 px-3">Contract End Date</th>
+                  <th className="py-2.5 px-3">API Status</th>
+                  <th className="py-2.5 px-3">Latency &amp; SLA</th>
+                  <th className="py-2.5 px-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-sans">
+                {filteredProviders.map(provider => {
+                  const daysLeft = getDaysRemaining(provider.contractEnd);
+                  const isExpiringSoon = daysLeft <= 60;
+                  const isPinging = pingingId === provider.id;
+
+                  return (
+                    <tr key={provider.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                      <td className="py-2.5 px-3">
+                        <div className="font-bold text-slate-900 dark:text-slate-100">
+                          {provider.name}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-mono">
+                          {provider.providerType}
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-slate-700 dark:text-slate-300">
+                        <div className="font-medium text-slate-900 dark:text-slate-100">{provider.purchasedGpuModel}</div>
+                        <div className="text-[10px] text-slate-400">
+                          {provider.purchasedGpuCount} Purchased · {provider.allocatedResourcesCount} Allocated
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono tabular-nums font-bold text-emerald-600 dark:text-emerald-400">
+                        {formatINR(provider.monthlyCommitment)}/mo
+                      </td>
+                      <td className="py-2.5 px-3 font-mono">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-slate-900 dark:text-slate-100">
+                            {provider.contractEnd}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            daysLeft <= 30
+                              ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                              : daysLeft <= 60
+                              ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                              : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                          }`}>
+                            {daysLeft > 0 ? `${daysLeft} days left` : 'Expired'}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-400">
+                          Started: {provider.contractStart}
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${
+                            provider.apiStatus === 'Operational'
+                              ? 'bg-emerald-500 animate-pulse'
+                              : provider.apiStatus === 'Degraded'
+                              ? 'bg-amber-500 animate-pulse'
+                              : 'bg-rose-500'
+                          }`} />
+                          <StatusBadge status={provider.apiStatus} />
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                          {provider.lastHeartbeat || 'Operational'}
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-xs">
+                        <div className="text-slate-700 dark:text-slate-200 font-semibold">
+                          {provider.apiLatencyMs}ms (P99)
+                        </div>
+                        <div className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                          {provider.uptime90d}% SLA
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                          <button
+                            onClick={() => openContractDialog(provider)}
+                            className="px-2.5 py-1 text-[11px] font-semibold text-cyan-700 dark:text-cyan-300 bg-cyan-50 dark:bg-cyan-950/40 hover:bg-cyan-100 dark:hover:bg-cyan-900/60 border border-cyan-200 dark:border-cyan-800 rounded-md transition-colors flex items-center gap-1"
+                            title="Edit Contract End Date & API Status"
+                          >
+                            <Calendar className="w-3 h-3 text-cyan-500" />
+                            <span>Edit Contract &amp; API</span>
+                          </button>
+                          <button
+                            onClick={() => handlePing(provider.id)}
+                            disabled={isPinging}
+                            className="px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-md transition-colors flex items-center gap-1"
+                            title="Probe API Endpoint and Test Latency"
+                          >
+                            <RefreshCw className={`w-3 h-3 ${isPinging ? 'animate-spin text-cyan-600' : ''}`} />
+                            <span>{isPinging ? 'Pinging...' : 'Ping API'}</span>
+                          </button>
+                          <button
+                            onClick={() => openConnectDialog(provider)}
+                            className="px-2 py-1 text-[11px] text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded transition-colors"
+                            title="Connector Settings"
+                          >
+                            <KeyRound className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        /* Providers Grid (Strictly GPU Clouds with API Connector & Capacity Details) */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+          {filteredProviders.map(provider => {
+            const daysLeft = getDaysRemaining(provider.contractEnd);
+            const isExpiringSoon = daysLeft <= 60;
+            const isPinging = pingingId === provider.id;
+            const availableUnits = Math.max(0, (provider.purchasedGpuCount || 0) - (provider.allocatedResourcesCount || 0));
+
+            return (
+              <div
+                key={provider.id}
+                className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col justify-between shadow-xs transition-all hover:border-cyan-500/50"
+              >
+                <div>
+                  {/* Top Row: Provider Brand & API Status */}
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                          {provider.name}
+                        </h3>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-100 dark:bg-cyan-950 text-cyan-800 dark:text-cyan-300 font-semibold border border-cyan-200 dark:border-cyan-800">
+                          {provider.providerType}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {provider.serviceType}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`w-2 h-2 rounded-full ${
+                          provider.apiStatus === 'Operational'
+                            ? 'bg-emerald-500 animate-pulse'
+                            : provider.apiStatus === 'Degraded'
+                            ? 'bg-amber-500 animate-pulse'
+                            : 'bg-rose-500'
+                        }`} />
+                        <StatusBadge status={provider.apiStatus} />
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-400">
+                        {provider.apiLatencyMs}ms (P99)
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Celerko Capacity Manager Section */}
+                  <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700/80 mb-3 space-y-2 text-xs font-mono">
+                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-200 dark:border-slate-700/60 font-sans">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs flex items-center gap-1.5">
+                        <Server className="w-3.5 h-3.5 text-cyan-500" />
+                        <span>Capacity Manager ({provider.purchasedGpuModel})</span>
+                      </span>
+                      <button
+                        onClick={() => openCapacityDialog(provider)}
+                        className="text-[11px] text-cyan-600 dark:text-cyan-400 hover:underline font-semibold flex items-center gap-1"
+                      >
+                        <Sliders className="w-3 h-3" />
+                        <span>Adjust Pool</span>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-2 text-center pt-0.5">
+                      <div className="p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                        <div className="text-[10px] text-slate-400 font-sans">Purchased</div>
+                        <div className="text-sm font-bold text-slate-900 dark:text-slate-100 font-mono">
+                          {provider.purchasedGpuCount}
+                        </div>
+                      </div>
+                      <div className="p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                        <div className="text-[10px] text-slate-400 font-sans">Allocated</div>
+                        <div className="text-sm font-bold text-amber-600 dark:text-amber-400 font-mono">
+                          {provider.allocatedResourcesCount}
+                        </div>
+                      </div>
+                      <div className="p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                        <div className="text-[10px] text-slate-400 font-sans">Running</div>
+                        <div className="text-sm font-bold text-blue-600 dark:text-blue-400 font-mono">
+                          {provider.runningGpuCount}
+                        </div>
+                      </div>
+                      <div className="p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                        <div className="text-[10px] text-slate-400 font-sans">Available</div>
+                        <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                          {availableUnits}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-1.5 border-t border-slate-200 dark:border-slate-700/60 font-sans">
+                      <span className="text-slate-500 font-medium text-[11px]">Wholesale Commitment:</span>
+                      <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono text-xs">
+                        {formatINR(provider.monthlyCommitment)}/mo
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Celerko Provider API Connector Details */}
+                  <div className="p-3 bg-slate-900/90 text-slate-200 rounded-lg border border-slate-700 mb-3 space-y-1.5 text-xs font-mono">
+                    <div className="flex items-center justify-between text-[11px] pb-1 border-b border-slate-700">
+                      <span className="text-cyan-400 font-sans font-semibold flex items-center gap-1.5">
+                        <KeyRound className="w-3 h-3 text-cyan-400" />
+                        <span>Provider API Connector</span>
+                      </span>
+                      <span className="text-[10px] text-emerald-400 bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-800">
+                        Backend Sync Active
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-[11px] items-center">
+                      <span className="text-slate-400 font-sans">Endpoint:</span>
+                      <span className="text-cyan-300 truncate max-w-[210px]">{provider.apiEndpoint || 'https://api.upstream.gpu/v1'}</span>
+                    </div>
+
+                    <div className="flex justify-between text-[11px] items-center">
+                      <span className="text-slate-400 font-sans flex items-center gap-1">
+                        <Lock className="w-3 h-3 text-amber-400" />
+                        <span>Upstream Secret Key:</span>
+                      </span>
+                      <span className="text-amber-300 font-bold">{provider.upstreamKeyMasked || 'sk_live_••••••••9a21'}</span>
+                    </div>
+
+                    <div className="flex justify-between text-[10px] text-slate-400 pt-1">
+                      <span>Client Exposure:</span>
+                      <span className="text-rose-400 font-semibold font-sans">Zero (Strictly Masked &amp; Hidden)</span>
+                    </div>
+                  </div>
+
+                  {/* Contract Dates & Agreement Term */}
+                  <div className="space-y-1.5 text-xs font-mono text-[11px] mb-4">
+                    <div className="flex items-center justify-between p-2 rounded bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/50">
+                      <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-sans">
+                        <Calendar className="w-3.5 h-3.5 text-amber-500" />
+                        <span>Contract End Date:</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900 dark:text-slate-100">
+                          {provider.contractEnd}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          daysLeft <= 30
+                            ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                            : daysLeft <= 60
+                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                            : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                        }`}>
+                          {daysLeft > 0 ? `${daysLeft} days left` : 'Expired'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between text-slate-500 px-1">
+                      <span>90-Day SLA Uptime:</span>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold">{provider.uptime90d}%</span>
+                    </div>
+                    <div className="flex justify-between text-slate-500 px-1">
+                      <span>Last Automated Heartbeat:</span>
+                      <span className="text-slate-600 dark:text-slate-300">{provider.lastHeartbeat || 'Operational'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Actions */}
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs gap-2">
+                  <span className="text-slate-400 text-[11px] truncate">{provider.contactEmail}</span>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => openContractDialog(provider)}
+                      className="px-2.5 py-1 text-[11px] font-semibold text-cyan-700 dark:text-cyan-300 bg-cyan-50 dark:bg-cyan-950/40 hover:bg-cyan-100 dark:hover:bg-cyan-900/60 border border-cyan-200 dark:border-cyan-800 rounded-md transition-colors flex items-center gap-1"
+                      title="Edit Contract End Date & API Status"
+                    >
+                      <Calendar className="w-3 h-3 text-cyan-500" />
+                      <span>Edit Contract &amp; API</span>
+                    </button>
+
+                    <button
+                      onClick={() => openConnectDialog(provider)}
+                      className="px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800 rounded-md transition-colors flex items-center gap-1"
+                      title="Configure Provider API Connector"
+                    >
+                      <KeyRound className="w-3 h-3" />
+                      <span>API Config</span>
+                    </button>
+
+                    <button
+                      onClick={() => handlePing(provider.id)}
+                      disabled={isPinging}
+                      className="px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-md transition-colors flex items-center gap-1"
+                      title="Probe API Endpoint and Test Latency"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isPinging ? 'animate-spin text-cyan-600' : ''}`} />
+                      <span>{isPinging ? 'Probing...' : 'Ping API'}</span>
+                    </button>
+
+                    {isExpiringSoon && (
+                      <button
+                        onClick={() => handleTriggerContractAlert(provider)}
+                        className="px-2 py-1 text-[11px] font-semibold text-amber-800 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950 dark:text-amber-300 rounded-md transition-colors"
+                        title="Set Expiration Warning Alert"
+                      >
+                        Warning
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Modal: Provider API Connector Configuration */}
       {showConnectModal && selectedProviderForConnect && (
@@ -587,6 +804,143 @@ export const ProvidersView: React.FC = () => {
                   className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-semibold shadow-xs"
                 >
                   Update Capacity Pool
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit Provider Contract End Date & API Status */}
+      {showContractModal && selectedProviderForContract && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl max-w-lg w-full p-6 shadow-2xl space-y-4 text-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-cyan-500" />
+                <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                  Provider Contract End Date &amp; API Status
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowContractModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-mono text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg flex items-center justify-between">
+              <div>
+                <div className="font-bold text-slate-900 dark:text-slate-100">{selectedProviderForContract.name}</div>
+                <div className="text-[11px] text-slate-500 font-mono">{selectedProviderForContract.providerType}</div>
+              </div>
+              <div className="text-right">
+                <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                  {formatINR(selectedProviderForContract.monthlyCommitment)}/mo
+                </div>
+                <div className="text-[10px] text-slate-400">{selectedProviderForContract.purchasedGpuModel}</div>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveContract} className="space-y-4">
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 font-sans">
+                  Contract End Date (Required)
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    required
+                    value={editContractEnd}
+                    onChange={e => setEditContractEnd(e.target.value)}
+                    className="flex-1 px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-slate-100"
+                  />
+                  {editContractEnd && (
+                    <span className={`px-2.5 py-1.5 rounded text-[11px] font-bold font-mono ${
+                      getDaysRemaining(editContractEnd) <= 30
+                        ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                        : getDaysRemaining(editContractEnd) <= 60
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                        : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                    }`}>
+                      {getDaysRemaining(editContractEnd)} days left
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Adjust wholesale agreement expiry date to recalculate renewal warnings and procurement alerts.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 font-sans">
+                  Contract Start Date
+                </label>
+                <input
+                  type="date"
+                  value={editContractStart}
+                  onChange={e => setEditContractStart(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 font-sans">
+                  Upstream API Gateway Status
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['Operational', 'Degraded', 'Offline'] as const).map(status => (
+                    <button
+                      type="button"
+                      key={status}
+                      onClick={() => setEditApiStatus(status)}
+                      className={`p-2.5 rounded-lg border text-center transition-all flex flex-col items-center gap-1 font-semibold ${
+                        editApiStatus === status
+                          ? status === 'Operational'
+                            ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 text-emerald-700 dark:text-emerald-300'
+                            : status === 'Degraded'
+                            ? 'bg-amber-50 dark:bg-amber-950/60 border-amber-500 text-amber-700 dark:text-amber-300'
+                            : 'bg-rose-50 dark:bg-rose-950/60 border-rose-500 text-rose-700 dark:text-rose-300'
+                          : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-400'
+                      }`}
+                    >
+                      <span className={`w-2.5 h-2.5 rounded-full ${
+                        status === 'Operational' ? 'bg-emerald-500' : status === 'Degraded' ? 'bg-amber-500' : 'bg-rose-500'
+                      }`} />
+                      <span>{status}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 font-sans">
+                  Monthly Commitment (₹ INR)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="10000"
+                  value={editMonthlyCommitment}
+                  onChange={e => setEditMonthlyCommitment(Number(e.target.value))}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowContractModal(false)}
+                  className="px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium hover:bg-slate-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-semibold shadow-xs"
+                >
+                  Save Contract &amp; API Status
                 </button>
               </div>
             </form>

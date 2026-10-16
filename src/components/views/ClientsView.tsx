@@ -16,11 +16,16 @@ import {
   X,
   Share2,
   Link2,
+  PauseCircle,
+  PlayCircle,
+  AlertTriangle,
+  Zap,
+  Calculator,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { MetricCard } from '../common/MetricCard';
 import { StatusBadge } from '../common/StatusBadge';
-import { Client, ResourceRequirement } from '../../types';
+import { Client, ResourceRequirement, GpuInventoryItem } from '../../types';
 import { ClientProfileModal } from './ClientProfileModal';
 import { formatINR } from '../../data/mockData';
 
@@ -39,6 +44,10 @@ export const ClientsView: React.FC = () => {
     getClientPortalUrl,
     getClientShareMessage,
     openClientPortal,
+    holdGpu,
+    releaseGpuHold,
+    updateClientUnbilledUsage,
+    billClientUnbilledUsage,
   } = useApp();
 
   const [search, setSearch] = useState('');
@@ -51,6 +60,17 @@ export const ClientsView: React.FC = () => {
   const [copiedUrlOnly, setCopiedUrlOnly] = useState(false);
   const [copiedRowUrlId, setCopiedRowUrlId] = useState<string | null>(null);
   const [quickAllocClient, setQuickAllocClient] = useState<{ client: Client; type: 'gpu' | 'did' } | null>(null);
+
+  // Unbilled Usage Modal State
+  const [selectedClientForUnbilled, setSelectedClientForUnbilled] = useState<Client | null>(null);
+  const [editUnbilledAmount, setEditUnbilledAmount] = useState<number>(0);
+  const [editUnbilledGpuHours, setEditUnbilledGpuHours] = useState<number>(0);
+  const [editUnbilledSipMinutes, setEditUnbilledSipMinutes] = useState<number>(0);
+
+  // Hold GPU for Client Modal State
+  const [holdingClientGpu, setHoldingClientGpu] = useState<{ client: Client; gpu: GpuInventoryItem } | null>(null);
+  const [clientHoldReason, setClientHoldReason] = useState<string>('');
+  const [clientActionFeedback, setClientActionFeedback] = useState<string | null>(null);
 
   // Quick allocation modal fields
   const [selectedGpuNode, setSelectedGpuNode] = useState('');
@@ -200,6 +220,55 @@ export const ClientsView: React.FC = () => {
     setSelectedDidId('');
   };
 
+  const openUnbilledDialog = (client: Client) => {
+    setSelectedClientForUnbilled(client);
+    setEditUnbilledAmount(client.unbilledUsage || 0);
+    setEditUnbilledGpuHours(client.unbilledGpuHours || 0);
+    setEditUnbilledSipMinutes(client.unbilledSipMinutes || 0);
+  };
+
+  const handleSaveUnbilledUsage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedClientForUnbilled) {
+      updateClientUnbilledUsage(
+        selectedClientForUnbilled.id,
+        Number(editUnbilledAmount),
+        Number(editUnbilledGpuHours),
+        Number(editUnbilledSipMinutes)
+      );
+      setClientActionFeedback(`Updated unbilled usage for ${selectedClientForUnbilled.companyName}.`);
+      setSelectedClientForUnbilled(null);
+      setTimeout(() => setClientActionFeedback(null), 3000);
+    }
+  };
+
+  const handleBillClientUnbilled = (clientId: string, clientName: string) => {
+    billClientUnbilledUsage(clientId);
+    setClientActionFeedback(`Created new draft invoice from unbilled usage for ${clientName}!`);
+    setTimeout(() => setClientActionFeedback(null), 3500);
+  };
+
+  const openHoldGpuDialog = (client: Client, gpu: GpuInventoryItem) => {
+    setHoldingClientGpu({ client, gpu });
+    setClientHoldReason('');
+  };
+
+  const handleConfirmClientGpuHold = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!holdingClientGpu || !clientHoldReason.trim()) return;
+    holdGpu(holdingClientGpu.gpu.id, clientHoldReason.trim());
+    setClientActionFeedback(`Placed ${holdingClientGpu.gpu.gpuId} for ${holdingClientGpu.client.companyName} on Hold.`);
+    setHoldingClientGpu(null);
+    setClientHoldReason('');
+    setTimeout(() => setClientActionFeedback(null), 3500);
+  };
+
+  const handleReleaseClientGpuHold = (gpuId: string, clientName: string) => {
+    releaseGpuHold(gpuId);
+    setClientActionFeedback(`Released GPU hold for ${clientName} — restored to active allocation.`);
+    setTimeout(() => setClientActionFeedback(null), 3500);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -221,6 +290,13 @@ export const ClientsView: React.FC = () => {
           <span>Add New Client</span>
         </button>
       </div>
+
+      {clientActionFeedback && (
+        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 rounded-lg text-emerald-800 dark:text-emerald-200 text-xs font-medium flex items-center gap-2 animate-fadeIn">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <span>{clientActionFeedback}</span>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -327,7 +403,12 @@ export const ClientsView: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-sans">
-              {filteredClients.map(client => (
+              {filteredClients.map(client => {
+                const clientGpuList = gpus.filter(g => g.assignedClient === client.companyName);
+                const heldGpu = clientGpuList.find(g => g.status === 'Hold');
+                const activeGpu = clientGpuList.find(g => g.status !== 'Hold');
+
+                return (
                 <tr
                   key={client.id}
                   className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
@@ -335,6 +416,13 @@ export const ClientsView: React.FC = () => {
                   <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-slate-100">
                     <div>{client.companyName}</div>
                     <div className="text-[10px] font-mono text-slate-400">{client.email}</div>
+                    {heldGpu && (
+                      <div className="mt-1 flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 text-[10px] text-amber-800 dark:text-amber-200 font-sans" title={`Reason: ${heldGpu.holdReason}`}>
+                        <PauseCircle className="w-3 h-3 text-amber-500 shrink-0" />
+                        <span className="font-bold">GPU on Hold:</span>
+                        <span className="truncate max-w-[130px]">{heldGpu.holdReason || 'Administrative Hold'}</span>
+                      </div>
+                    )}
                   </td>
                   <td className="py-2.5 px-3 text-slate-700 dark:text-slate-300">
                     <div>{client.contactPerson}</div>
@@ -364,7 +452,14 @@ export const ClientsView: React.FC = () => {
                     </div>
                   </td>
                   <td className="py-2.5 px-3 text-right font-mono tabular-nums font-semibold text-slate-900 dark:text-slate-100">
-                    {client.allocatedGpuCount} nodes
+                    <div className="flex items-center justify-end gap-1.5">
+                      <span>{client.allocatedGpuCount} nodes</span>
+                      {heldGpu && (
+                        <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold" title="Node currently on Hold">
+                          (1 on Hold)
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300">
                     {client.allocatedDidCount} numbers
@@ -389,15 +484,37 @@ export const ClientsView: React.FC = () => {
                     })()}
                   </td>
                   <td className="py-2.5 px-3 text-right font-mono tabular-nums">
-                    <div className="font-semibold text-slate-900 dark:text-slate-100">
-                      {client.unbilledUsage && client.unbilledUsage > 0 ? formatINR(client.unbilledUsage) : '₹0'}
-                    </div>
-                    {(client.unbilledGpuHours || client.unbilledSipMinutes) ? (
-                      <div className="text-[10px] text-slate-400">
-                        {client.unbilledGpuHours ? `${client.unbilledGpuHours}h GPU ` : ''}
-                        {client.unbilledSipMinutes ? `${client.unbilledSipMinutes}m SIP` : ''}
+                    <div className="flex items-center justify-end gap-1.5">
+                      <div className="text-right">
+                        <div className="font-semibold text-slate-900 dark:text-slate-100">
+                          {client.unbilledUsage && client.unbilledUsage > 0 ? formatINR(client.unbilledUsage) : '₹0'}
+                        </div>
+                        {(client.unbilledGpuHours || client.unbilledSipMinutes) ? (
+                          <div className="text-[10px] text-slate-400">
+                            {client.unbilledGpuHours ? `${client.unbilledGpuHours}h GPU ` : ''}
+                            {client.unbilledSipMinutes ? `${client.unbilledSipMinutes}m SIP` : ''}
+                          </div>
+                        ) : null}
                       </div>
-                    ) : null}
+                      <div className="flex items-center gap-0.5">
+                        <button
+                          onClick={() => openUnbilledDialog(client)}
+                          className="p-1 text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                          title="Manage / Adjust Unbilled Usage"
+                        >
+                          <Calculator className="w-3.5 h-3.5" />
+                        </button>
+                        {client.unbilledUsage && client.unbilledUsage > 0 ? (
+                          <button
+                            onClick={() => handleBillClientUnbilled(client.id, client.companyName)}
+                            className="p-1 text-amber-600 hover:text-amber-500 dark:text-amber-400 rounded hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors"
+                            title="Bill Unbilled Usage to New Invoice"
+                          >
+                            <Zap className="w-3.5 h-3.5" />
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
                   </td>
                   <td className="py-2.5 px-3">
                     <div className="flex items-center gap-1.5">
@@ -431,6 +548,26 @@ export const ClientsView: React.FC = () => {
                   </td>
                   <td className="py-2.5 px-3 text-right">
                     <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                      {heldGpu ? (
+                        <button
+                          onClick={() => handleReleaseClientGpuHold(heldGpu.id, client.companyName)}
+                          className="px-2 py-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 rounded border border-emerald-300 dark:border-emerald-800 flex items-center gap-1 transition-colors"
+                          title="Release Hold on GPU allocation"
+                        >
+                          <PlayCircle className="w-3 h-3 text-emerald-600" />
+                          <span>Resume GPU</span>
+                        </button>
+                      ) : activeGpu ? (
+                        <button
+                          onClick={() => openHoldGpuDialog(client, activeGpu)}
+                          className="px-2 py-1 text-[11px] font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded flex items-center gap-1 transition-colors"
+                          title="Place GPU allocation on Hold with a reason"
+                        >
+                          <PauseCircle className="w-3 h-3 text-amber-600" />
+                          <span>Hold GPU</span>
+                        </button>
+                      ) : null}
+
                       <button
                         onClick={() => setCredentialsModalClient(client)}
                         className="px-2 py-1 text-[11px] font-semibold text-cyan-700 bg-cyan-50 hover:bg-cyan-100 dark:bg-cyan-950/40 dark:text-cyan-300 rounded flex items-center gap-1 transition-colors"
@@ -475,7 +612,8 @@ export const ClientsView: React.FC = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
+              );
+            })}
             </tbody>
           </table>
         </div>
@@ -989,6 +1127,252 @@ export const ClientsView: React.FC = () => {
                 <span>Launch Client Portal</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Manage & Adjust Unbilled Usage */}
+      {selectedClientForUnbilled && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl p-5 sm:p-6 space-y-4 text-xs">
+            <div className="flex items-start justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Calculator className="w-4 h-4 text-cyan-500" />
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                    Manage Unbilled Usage: {selectedClientForUnbilled.companyName}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-sans">
+                    Track accrued on-demand compute hours and carrier minutes awaiting the next billing run.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedClientForUnbilled(null)}
+                className="text-slate-400 hover:text-slate-200 font-mono text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg flex items-center justify-between font-mono">
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-sans">Current Unbilled Accrual</span>
+                <span className="text-base font-bold text-cyan-600 dark:text-cyan-400">
+                  {formatINR(selectedClientForUnbilled.unbilledUsage || 0)}
+                </span>
+              </div>
+              <div className="text-right text-[11px] text-slate-500 font-sans">
+                <div>GPU Hours: <strong>{selectedClientForUnbilled.unbilledGpuHours || 0} hrs</strong></div>
+                <div>SIP Carrier Minutes: <strong>{selectedClientForUnbilled.unbilledSipMinutes || 0} mins</strong></div>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveUnbilledUsage} className="space-y-3.5">
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 font-sans">
+                  Unbilled Usage Accrual Amount (₹ INR)
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="100"
+                    value={editUnbilledAmount}
+                    onChange={e => setEditUnbilledAmount(Number(e.target.value))}
+                    className="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono font-bold text-slate-900 dark:text-slate-100 text-xs"
+                  />
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setEditUnbilledAmount(prev => prev + 10000)}
+                      className="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-[10px] font-mono text-slate-700 dark:text-slate-300"
+                    >
+                      +₹10k
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditUnbilledAmount(prev => prev + 50000)}
+                      className="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-[10px] font-mono text-slate-700 dark:text-slate-300"
+                    >
+                      +₹50k
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 font-sans">
+                    Unbilled GPU Cluster Hours
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editUnbilledGpuHours}
+                    onChange={e => setEditUnbilledGpuHours(Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-slate-900 dark:text-slate-100 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 font-sans">
+                    Unbilled Carrier SIP Minutes
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editUnbilledSipMinutes}
+                    onChange={e => setEditUnbilledSipMinutes(Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-slate-900 dark:text-slate-100 text-xs"
+                  />
+                </div>
+              </div>
+
+              {selectedClientForUnbilled.unbilledUsage && selectedClientForUnbilled.unbilledUsage > 0 && (
+                <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-lg flex items-center justify-between">
+                  <div>
+                    <span className="font-bold text-amber-800 dark:text-amber-300 block text-xs">
+                      Convert Accrual to Invoice
+                    </span>
+                    <span className="text-[11px] text-amber-700/80 dark:text-amber-400">
+                      Instantly generate a draft billing invoice and reset unbilled counters.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleBillClientUnbilled(selectedClientForUnbilled.id, selectedClientForUnbilled.companyName);
+                      setSelectedClientForUnbilled(null);
+                    }}
+                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1 shadow-xs transition-colors shrink-0"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>Bill Now</span>
+                  </button>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setSelectedClientForUnbilled(null)}
+                  className="px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium hover:bg-slate-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-semibold shadow-xs flex items-center gap-1.5"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Save Unbilled Usage</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Place Client GPU on Hold with Required Reason */}
+      {holdingClientGpu && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl p-5 sm:p-6 space-y-4 text-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <PauseCircle className="w-4 h-4 text-amber-500" />
+                <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                  Place GPU on Hold: {holdingClientGpu.gpu.gpuId}
+                </h3>
+              </div>
+              <button
+                onClick={() => setHoldingClientGpu(null)}
+                className="text-slate-400 hover:text-slate-200 font-mono text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg flex items-center justify-between font-mono">
+              <div>
+                <div className="font-bold text-slate-900 dark:text-slate-100">{holdingClientGpu.gpu.gpuModel}</div>
+                <div className="text-[11px] text-slate-500">{holdingClientGpu.client.companyName} · {holdingClientGpu.gpu.allocatedQuantity} nodes</div>
+              </div>
+              <div className="text-right">
+                <StatusBadge status={holdingClientGpu.gpu.status} />
+              </div>
+            </div>
+
+            <form onSubmit={handleConfirmClientGpuHold} className="space-y-4">
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 font-sans">
+                  Reason for Hold (Required)
+                </label>
+                <p className="text-[11px] text-slate-400 mb-2 font-sans">
+                  Select a standardized reason or provide a specific explanation for pausing this client's GPU compute capacity.
+                </p>
+
+                <div className="flex flex-wrap gap-1.5 mb-2.5">
+                  {[
+                    'Payment Overdue (Net 30 Breached)',
+                    'Client Requested Temporary Pause',
+                    'Scheduled Node Maintenance / Firmware',
+                    'Client Usage Dispute',
+                    'Security & Abuse Audit',
+                    'Contract Renewal Pending',
+                  ].map(preset => (
+                    <button
+                      type="button"
+                      key={preset}
+                      onClick={() => setClientHoldReason(preset)}
+                      className={`px-2 py-1 rounded text-[10px] font-medium border transition-colors ${
+                        clientHoldReason === preset
+                          ? 'bg-amber-100 dark:bg-amber-950/60 border-amber-500 text-amber-800 dark:text-amber-200 font-semibold'
+                          : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100'
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+
+                <textarea
+                  required
+                  rows={3}
+                  value={clientHoldReason}
+                  onChange={e => setClientHoldReason(e.target.value)}
+                  placeholder="Enter detailed reason for placing this GPU on hold (e.g. Overdue payment on invoice #INV-2026-004, awaiting confirmation)..."
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs outline-hidden"
+                />
+              </div>
+
+              <div className="p-3 bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 rounded-lg text-[11px] text-amber-800 dark:text-amber-300 space-y-1">
+                <div className="font-semibold flex items-center gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Operational Note</span>
+                </div>
+                <p>
+                  Placing on hold immediately records the hold reason, flags the client's inventory in both admin and client portals, and logs the administrative action.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setHoldingClientGpu(null)}
+                  className="px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium hover:bg-slate-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!clientHoldReason.trim()}
+                  className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-semibold shadow-xs flex items-center gap-1.5 transition-all"
+                >
+                  <PauseCircle className="w-3.5 h-3.5" />
+                  <span>Confirm Hold with Reason</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -28,6 +28,8 @@ import {
   Share2,
   Link2,
   X,
+  AlertTriangle,
+  PauseCircle,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { MetricCard } from '../common/MetricCard';
@@ -748,15 +750,48 @@ export const ClientPortalView: React.FC = () => {
             ) : (
               <div className="space-y-2">
                 {clientGpus.map(g => (
-                  <div key={g.id} className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded border border-slate-200 dark:border-slate-800 flex justify-between items-center text-xs font-mono">
-                    <div>
-                      <div className="font-bold text-slate-900 dark:text-slate-100">{g.gpuId} — {g.gpuModel}</div>
-                      <div className="text-[10px] text-slate-400 font-sans">{g.region} · {g.vramGb}GB VRAM · Provider: {g.provider}</div>
+                  <div
+                    key={g.id}
+                    className={`p-3 rounded border text-xs font-mono transition-all ${
+                      g.status === 'Hold'
+                        ? 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-300 dark:border-amber-800/80'
+                        : 'bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800'
+                    }`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900 dark:text-slate-100">{g.gpuId} — {g.gpuModel}</span>
+                          <StatusBadge status={g.status} />
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-sans mt-0.5">{g.region} · {g.vramGb}GB VRAM · Provider: {g.provider}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-emerald-600 dark:text-emerald-400 font-bold font-sans">{formatINR(g.sellingPrice)}/mo</div>
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-sans ${
+                          g.status === 'Hold'
+                            ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-semibold'
+                            : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
+                        }`}>
+                          {g.status}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-emerald-600 dark:text-emerald-400 font-bold font-sans">{formatINR(g.sellingPrice)}/mo</div>
-                      <span className="px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 rounded text-[10px]">Active</span>
-                    </div>
+
+                    {g.status === 'Hold' && (
+                      <div className="mt-2.5 p-2 bg-amber-100/70 dark:bg-amber-900/30 rounded border border-amber-300 dark:border-amber-800 text-[11px] font-sans flex items-start gap-1.5 text-amber-900 dark:text-amber-200">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-bold">Allocation on Hold: </span>
+                          <span>{g.holdReason || 'Administrative Review'}</span>
+                          {g.heldAt && (
+                            <div className="text-[10px] text-amber-700/80 dark:text-amber-400 font-mono mt-0.5">
+                              Effective since: {g.heldAt}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

@@ -3,6 +3,7 @@ import {
   User,
   UserRole,
   GpuInventoryItem,
+  GpuStatus,
   SipProvider,
   DidNumber,
   Client,
@@ -182,10 +183,15 @@ interface AppContextType {
   revokeApiKey: (keyId: string) => void;
   connectProviderApi: (providerId: string, endpoint: string, secretKey: string) => void;
   updateProviderCapacity: (providerId: string, updates: Partial<Provider>) => void;
+  updateProvider: (providerId: string, updates: Partial<Provider>) => void;
 
   allocateGpu: (id: string, clientName: string, quantity: number) => void;
   reclaimGpu: (id: string) => void;
   transferGpu: (id: string, targetClient: string) => void;
+  holdGpu: (id: string, reason: string) => void;
+  releaseGpuHold: (id: string) => void;
+  updateClientUnbilledUsage: (clientId: string, unbilledUsage: number, unbilledGpuHours?: number, unbilledSipMinutes?: number) => void;
+  billClientUnbilledUsage: (clientId: string) => void;
   assignDid: (id: string, clientName: string) => void;
   releaseDid: (id: string) => void;
   suspendDid: (id: string) => void;
@@ -618,6 +624,124 @@ Please save and bookmark your dedicated URL for instant access.
         }
         return gpu;
       })
+    );
+  };
+
+  const holdGpu = (id: string, reason: string) => {
+    const finalReason = reason && reason.trim() ? reason.trim() : 'Under administrative compliance review';
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 16) + ' UTC';
+    setGpus(prev =>
+      prev.map(gpu => {
+        if (gpu.id === id) {
+          addAuditLog(
+            'GPU Placed on Hold',
+            `Status: ${gpu.status} (${gpu.assignedClient || 'Unassigned'})`,
+            `Status: Hold | Reason: ${finalReason}`,
+            gpu.gpuId
+          );
+          return {
+            ...gpu,
+            status: 'Hold',
+            holdReason: finalReason,
+            heldAt: now,
+            heldBy: currentUser?.name || 'Admin',
+          };
+        }
+        return gpu;
+      })
+    );
+  };
+
+  const releaseGpuHold = (id: string) => {
+    setGpus(prev =>
+      prev.map(gpu => {
+        if (gpu.id === id) {
+          const restoredStatus: GpuStatus = (gpu.allocatedQuantity > 0 || !!gpu.assignedClient) ? 'In Use' : 'Available';
+          addAuditLog(
+            'GPU Hold Released',
+            `Status: Hold (Reason: ${gpu.holdReason || 'N/A'})`,
+            `Status: ${restoredStatus} (Resumed)`,
+            gpu.gpuId
+          );
+          return {
+            ...gpu,
+            status: restoredStatus,
+            holdReason: undefined,
+            heldAt: undefined,
+            heldBy: undefined,
+          };
+        }
+        return gpu;
+      })
+    );
+  };
+
+  const updateClientUnbilledUsage = (clientId: string, unbilledUsage: number, unbilledGpuHours?: number, unbilledSipMinutes?: number) => {
+    setClients(prev =>
+      prev.map(c => {
+        if (c.id === clientId) {
+          addAuditLog(
+            'Client Usage Updated',
+            `Unbilled Usage: ₹${c.unbilledUsage || 0}`,
+            `Unbilled Usage: ₹${unbilledUsage} (${unbilledGpuHours ?? c.unbilledGpuHours ?? 0}h GPU, ${unbilledSipMinutes ?? c.unbilledSipMinutes ?? 0}m SIP)`,
+            c.companyName
+          );
+          return {
+            ...c,
+            unbilledUsage: Math.max(0, unbilledUsage),
+            unbilledGpuHours: unbilledGpuHours !== undefined ? Math.max(0, unbilledGpuHours) : c.unbilledGpuHours,
+            unbilledSipMinutes: unbilledSipMinutes !== undefined ? Math.max(0, unbilledSipMinutes) : c.unbilledSipMinutes,
+          };
+        }
+        return c;
+      })
+    );
+  };
+
+  const billClientUnbilledUsage = (clientId: string) => {
+    const client = clients.find(c => c.id === clientId);
+    if (!client || !client.unbilledUsage || client.unbilledUsage <= 0) return;
+
+    const unbilledAmount = client.unbilledUsage;
+    const gpuHours = client.unbilledGpuHours || 0;
+    const sipMins = client.unbilledSipMinutes || 0;
+
+    createInvoice({
+      clientId: client.id,
+      clientName: client.companyName,
+      clientEmail: client.email,
+      billingPeriod: `Unbilled Cycle Usage — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
+      gpuCount: client.allocatedGpuCount,
+      gpuCharges: gpuHours > 0 ? Math.round(unbilledAmount * 0.85) : Math.round(unbilledAmount * 0.7),
+      sipCount: client.allocatedSipCount,
+      sipCharges: sipMins > 0 ? Math.round(unbilledAmount * 0.15) : Math.round(unbilledAmount * 0.3),
+      didCount: client.allocatedDidCount,
+      didCharges: 0,
+      subtotal: unbilledAmount,
+      taxes: Math.round(unbilledAmount * 0.18),
+      totalAmount: Math.round(unbilledAmount * 1.18),
+    });
+
+    setClients(prev =>
+      prev.map(c => {
+        if (c.id === clientId) {
+          return {
+            ...c,
+            unbilledUsage: 0,
+            unbilledGpuHours: 0,
+            unbilledSipMinutes: 0,
+            lastBilledDate: new Date().toISOString().split('T')[0],
+          };
+        }
+        return c;
+      })
+    );
+
+    addAuditLog(
+      'Invoice Generated',
+      `Unbilled Usage: ₹${unbilledAmount}`,
+      `Billed to Invoice (Reset unbilled usage to ₹0)`,
+      client.companyName
     );
   };
 
@@ -1270,6 +1394,26 @@ Please save and bookmark your dedicated URL for instant access.
     );
   };
 
+  const updateProvider = (providerId: string, updates: Partial<Provider>) => {
+    setProviders(prev =>
+      prev.map(p => {
+        if (p.id === providerId) {
+          addAuditLog(
+            'Provider Updated',
+            `Contract End: ${p.contractEnd}, API Status: ${p.apiStatus}`,
+            `Contract End: ${updates.contractEnd || p.contractEnd}, API Status: ${updates.apiStatus || p.apiStatus}`,
+            p.name
+          );
+          return {
+            ...p,
+            ...updates,
+          };
+        }
+        return p;
+      })
+    );
+  };
+
   const clearAllMockData = () => {
     setGpus([]);
     setDids([]);
@@ -1556,9 +1700,14 @@ Please save and bookmark your dedicated URL for instant access.
         revokeApiKey,
         connectProviderApi,
         updateProviderCapacity,
+        updateProvider,
         allocateGpu,
         reclaimGpu,
         transferGpu,
+        holdGpu,
+        releaseGpuHold,
+        updateClientUnbilledUsage,
+        billClientUnbilledUsage,
         assignDid,
         releaseDid,
         suspendDid,

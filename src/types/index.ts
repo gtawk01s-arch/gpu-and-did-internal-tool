@@ -40,12 +40,12 @@ export interface User {
   permissions?: UserAccessPermissions; // Granular access rights configured by Super Admin
 }
 
-export type GpuStatus = 'In Use' | 'Available' | 'Reserved' | 'Maintenance';
+export type GpuStatus = 'In Use' | 'Available' | 'Reserved' | 'Maintenance' | 'Hold';
 
 export interface GpuInventoryItem {
   id: string;
   gpuId: string;
-  provider: 'RunPod' | 'Lambda Labs' | 'Vast.ai' | 'CoreWeave' | 'Equinix DC' | 'Crusoe Energy';
+  provider: 'RunPod' | 'Lambda Labs' | 'Vast.ai' | 'CoreWeave' | 'Equinix DC' | 'Crusoe Energy' | string;
   region: string;
   gpuModel: string;
   quantity: number;
@@ -56,6 +56,9 @@ export interface GpuInventoryItem {
   contractStart: string;
   contractEnd: string;
   status: GpuStatus;
+  holdReason?: string; // Reason field on Hold GPU (Mandatory when placed on Hold)
+  heldAt?: string; // Timestamp when placed on Hold
+  heldBy?: string; // Admin or user who placed GPU on Hold
   vramGb: number;
   interconnect: string;
   assignedClient?: string;
@@ -291,20 +294,27 @@ export interface SystemAlert {
   };
 }
 
+export type AuditLogAction =
+  | 'Invoice Creation'
+  | 'Invoice Payment'
+  | 'GPU Allocation'
+  | 'DID Allocation'
+  | 'User Login'
+  | 'Client Creation'
+  | 'Provider Changes'
+  | 'Provider Updated'
+  | 'Approval Updated'
+  | 'System Configuration'
+  | 'GPU Placed on Hold'
+  | 'GPU Hold Released'
+  | 'Client Usage Updated'
+  | 'Invoice Generated';
+
 export interface AuditLog {
   id: string;
   user: string;
   role: UserRole;
-  action:
-    | 'Invoice Creation'
-    | 'Invoice Payment'
-    | 'GPU Allocation'
-    | 'DID Allocation'
-    | 'User Login'
-    | 'Client Creation'
-    | 'Provider Changes'
-    | 'Approval Updated'
-    | 'System Configuration';
+  action: AuditLogAction;
   timestamp: string;
   ipAddress: string;
   oldValue: string;

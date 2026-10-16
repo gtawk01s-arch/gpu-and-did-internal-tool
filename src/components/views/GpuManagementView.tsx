@@ -10,6 +10,9 @@ import {
   ExternalLink,
   Cpu,
   History,
+  PauseCircle,
+  PlayCircle,
+  AlertTriangle,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { MetricCard } from '../common/MetricCard';
@@ -18,7 +21,7 @@ import { GpuInventoryItem, GpuStatus } from '../../types';
 import { formatINR } from '../../data/mockData';
 
 export const GpuManagementView: React.FC = () => {
-  const { gpus, clients, allocateGpu, reclaimGpu, transferGpu, auditLogs } = useApp();
+  const { gpus, clients, allocateGpu, reclaimGpu, transferGpu, auditLogs, holdGpu, releaseGpuHold } = useApp();
 
   const [search, setSearch] = useState('');
   const [providerFilter, setProviderFilter] = useState('All');
@@ -32,6 +35,10 @@ export const GpuManagementView: React.FC = () => {
   const [transferringGpu, setTransferringGpu] = useState<GpuInventoryItem | null>(null);
   const [targetTransferClient, setTargetTransferClient] = useState('');
 
+  // Hold GPU Modal State
+  const [holdingGpu, setHoldingGpu] = useState<GpuInventoryItem | null>(null);
+  const [holdReason, setHoldReason] = useState<string>('');
+
   const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   // Stats
@@ -40,6 +47,7 @@ export const GpuManagementView: React.FC = () => {
   const totalAvailable = totalPurchased - totalAllocated;
   const inUseCount = gpus.filter(g => g.status === 'In Use').reduce((sum, g) => sum + g.allocatedQuantity, 0);
   const reservedCount = gpus.filter(g => g.status === 'Reserved').reduce((sum, g) => sum + g.quantity, 0);
+  const holdCount = gpus.filter(g => g.status === 'Hold').reduce((sum, g) => sum + (g.allocatedQuantity || g.quantity), 0);
 
   // Filters
   const filteredGpus = gpus.filter(g => {
@@ -98,12 +106,13 @@ export const GpuManagementView: React.FC = () => {
       </div>
 
       {/* GPU Capacity KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <MetricCard label="Total Purchased" value={totalPurchased}  />
-        <MetricCard label="Total Allocated" value={totalAllocated}  />
-        <MetricCard label="Available" value={totalAvailable}  />
+      <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
+        <MetricCard label="Total Purchased" value={totalPurchased} />
+        <MetricCard label="Total Allocated" value={totalAllocated} />
+        <MetricCard label="Available" value={totalAvailable} />
         <MetricCard label="In Use (Online)" value={inUseCount} />
-        <MetricCard label="Reserved" value={reservedCount}  />
+        <MetricCard label="Reserved" value={reservedCount} />
+        <MetricCard label="On Hold" value={holdCount} badge={holdCount > 0 ? "Alert" : undefined} />
       </div>
 
       {/* Filters & Search Bar */}
@@ -146,6 +155,7 @@ export const GpuManagementView: React.FC = () => {
               <option value="Available">Available</option>
               <option value="Reserved">Reserved</option>
               <option value="Maintenance">Maintenance</option>
+              <option value="Hold">Hold</option>
             </select>
           </div>
         </div>
@@ -228,11 +238,50 @@ export const GpuManagementView: React.FC = () => {
                         )}
                       </td>
                       <td className="py-2.5 px-3">
-                        <StatusBadge status={gpu.status} />
+                        <div className="space-y-1">
+                          <StatusBadge status={gpu.status} />
+                          {gpu.status === 'Hold' && (
+                            <div className="p-1.5 bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 rounded text-[10px] text-amber-800 dark:text-amber-200 font-sans max-w-[190px]">
+                              <div className="font-bold flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" />
+                                <span>Hold Reason:</span>
+                              </div>
+                              <div className="truncate font-medium mt-0.5" title={gpu.holdReason}>{gpu.holdReason || 'Administrative Review'}</div>
+                              {gpu.heldAt && (
+                                <div className="text-[9px] text-amber-600 dark:text-amber-400 font-mono mt-0.5">
+                                  {gpu.heldAt} {gpu.heldBy ? `· ${gpu.heldBy}` : ''}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="py-2.5 px-3 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {free > 0 && (
+                        <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                          {gpu.status === 'Hold' ? (
+                            <button
+                              onClick={() => releaseGpuHold(gpu.id)}
+                              className="px-2 py-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 rounded transition-colors flex items-center gap-1"
+                              title="Release hold and restore GPU allocation"
+                            >
+                              <PlayCircle className="w-3 h-3 text-emerald-600" />
+                              <span>Resume</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setHoldingGpu(gpu);
+                                setHoldReason('');
+                              }}
+                              className="px-2 py-1 text-[11px] font-medium text-amber-800 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded transition-colors flex items-center gap-1"
+                              title="Place GPU on Hold with mandatory reason"
+                            >
+                              <PauseCircle className="w-3 h-3 text-amber-600" />
+                              <span>Hold</span>
+                            </button>
+                          )}
+
+                          {free > 0 && gpu.status !== 'Hold' && (
                             <button
                               onClick={() => {
                                 setAllocatingGpu(gpu);
@@ -450,6 +499,121 @@ export const GpuManagementView: React.FC = () => {
                 ))
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Place GPU on Hold with Required Reason */}
+      {holdingGpu && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl p-5 sm:p-6 space-y-4 text-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <PauseCircle className="w-4 h-4 text-amber-500" />
+                <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                  Place GPU on Hold: {holdingGpu.gpuId}
+                </h3>
+              </div>
+              <button
+                onClick={() => setHoldingGpu(null)}
+                className="text-slate-400 hover:text-slate-200 font-mono text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg flex items-center justify-between font-mono">
+              <div>
+                <div className="font-bold text-slate-900 dark:text-slate-100">{holdingGpu.gpuModel}</div>
+                <div className="text-[11px] text-slate-500">
+                  {holdingGpu.provider} · {holdingGpu.region} · {holdingGpu.assignedClient ? `Assigned: ${holdingGpu.assignedClient}` : 'Unassigned'}
+                </div>
+              </div>
+              <div className="text-right">
+                <StatusBadge status={holdingGpu.status} />
+              </div>
+            </div>
+
+            <form
+              onSubmit={e => {
+                e.preventDefault();
+                if (!holdingGpu || !holdReason.trim()) return;
+                holdGpu(holdingGpu.id, holdReason.trim());
+                setHoldingGpu(null);
+                setHoldReason('');
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 font-sans">
+                  Reason for Hold (Required)
+                </label>
+                <p className="text-[11px] text-slate-400 mb-2 font-sans">
+                  Document the operational or business justification for placing this GPU node cluster on hold.
+                </p>
+
+                <div className="flex flex-wrap gap-1.5 mb-2.5">
+                  {[
+                    'Payment Overdue (Net 30 Breached)',
+                    'Client Requested Temporary Pause',
+                    'Scheduled Node Maintenance / Firmware',
+                    'Client Usage Dispute',
+                    'Security & Abuse Audit',
+                    'Upstream Provider Hardware Diagnostic',
+                  ].map(preset => (
+                    <button
+                      type="button"
+                      key={preset}
+                      onClick={() => setHoldReason(preset)}
+                      className={`px-2 py-1 rounded text-[10px] font-medium border transition-colors ${
+                        holdReason === preset
+                          ? 'bg-amber-100 dark:bg-amber-950/60 border-amber-500 text-amber-800 dark:text-amber-200 font-semibold'
+                          : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100'
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+
+                <textarea
+                  required
+                  rows={3}
+                  value={holdReason}
+                  onChange={e => setHoldReason(e.target.value)}
+                  placeholder="Enter detailed reason for placing this GPU on hold..."
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs outline-hidden"
+                />
+              </div>
+
+              <div className="p-3 bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 rounded-lg text-[11px] text-amber-800 dark:text-amber-300 space-y-1">
+                <div className="font-semibold flex items-center gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Administrative Impact</span>
+                </div>
+                <p>
+                  Placing on hold records the reason in audit trails and updates status across internal tools and client portal.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setHoldingGpu(null)}
+                  className="px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium hover:bg-slate-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!holdReason.trim()}
+                  className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-semibold shadow-xs flex items-center gap-1.5 transition-all"
+                >
+                  <PauseCircle className="w-3.5 h-3.5" />
+                  <span>Confirm Hold with Reason</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
