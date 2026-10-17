@@ -217,14 +217,7 @@ export const ClientPortalView: React.FC = () => {
   if (!authenticatedClient) {
     return (
       <div className="min-h-[85vh] flex flex-col items-center justify-center p-4 space-y-4">
-        {/* Top Operator Bar */}
-        <div className="w-full max-w-xl p-3 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between text-xs text-slate-300 shadow-md">
-          <div className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-cyan-400 shrink-0" />
-            <span className="font-semibold text-white">Client Portal URL</span>
-            <span className="text-slate-500 hidden sm:inline font-mono text-[11px]">(?panel=client)</span>
-          </div>
-        </div>
+        
 
         <div className="w-full max-w-xl space-y-5">
           {/* Brand header */}
