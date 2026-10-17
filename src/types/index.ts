@@ -40,6 +40,59 @@ export interface User {
   permissions?: UserAccessPermissions; // Granular access rights configured by Super Admin
 }
 
+export interface UserSession {
+  id: string;
+  userId: string;
+  userName: string;
+  userRole: UserRole;
+  userEmail: string;
+  ipAddress: string;
+  location: string;
+  browser: string;
+  os: string;
+  deviceType: 'Desktop' | 'Mobile' | 'Tablet';
+  loginAt: string;
+  lastActiveAt: string;
+  isCurrentSession: boolean;
+  tokenMasked: string;
+}
+
+export interface LoginHistoryEntry {
+  id: string;
+  userId?: string;
+  userName: string;
+  userEmail: string;
+  userRole: string;
+  ipAddress: string;
+  location: string;
+  browser: string;
+  os: string;
+  status: 'Success' | 'Failed';
+  failureReason?: string;
+  timestamp: string;
+  authMethod: 'Admin Password' | 'Client Portal Credentials' | 'Role Impersonation';
+}
+
+export interface RealTelemetryStats {
+  publicIp: string;
+  ispOrOrg: string;
+  country: string;
+  city: string;
+  os: string;
+  browser: string;
+  isOnline: boolean;
+  effectiveType: string;
+  rttMs: number;
+  downlinkMbps: number;
+  cpuCores: number;
+  memoryUsedMb?: number;
+  memoryTotalMb?: number;
+  storageUsedMb?: number;
+  storageQuotaMb?: number;
+  sessionUptimeSeconds: number;
+  lastUpdated: string;
+}
+
 export type GpuStatus = 'In Use' | 'Available' | 'Reserved' | 'Maintenance' | 'Hold';
 
 export interface GpuInventoryItem {

@@ -54,10 +54,10 @@ export const AdminLoginView: React.FC = () => {
             CK
           </div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
-            Celerko Broker Command
+            Celerko Internal
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Administrative access gate for wholesale GPU clusters &amp; DID telecom infrastructure.
+            GPU Capacity - DID Telecom - Client Provisioning - Billing 
           </p>
         </div>
 
@@ -69,7 +69,7 @@ export const AdminLoginView: React.FC = () => {
               <span>Admin Authentication</span>
             </span>
             <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-100 dark:bg-cyan-950 text-cyan-800 dark:text-cyan-300 font-semibold border border-cyan-200 dark:border-cyan-800">
-              SHA-256 Hashed
+              
             </span>
           </div>
 
@@ -90,7 +90,6 @@ export const AdminLoginView: React.FC = () => {
                 <input
                   type="email"
                   required
-                  placeholder="admin@aethervox.cloud"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 outline-hidden focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all font-mono"
@@ -136,29 +135,7 @@ export const AdminLoginView: React.FC = () => {
                 </>
               )}
             </button>
-          </form>
-
-          {/* Quick Demo Credentials */}
-          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
-            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
-              Super Admin Quick Sign-In:
-            </span>
-            <button
-              type="button"
-              onClick={() => handleQuickDemoSelect('marcus.vance@aethervox.cloud', 'SuperAdmin@2026')}
-              className="w-full p-2.5 text-left bg-slate-50 dark:bg-slate-800/60 hover:bg-cyan-50 dark:hover:bg-cyan-950/40 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors group flex items-center justify-between"
-            >
-              <div>
-                <div className="font-bold text-slate-800 dark:text-slate-200 group-hover:text-cyan-500">
-                  Marcus Vance
-                </div>
-                <div className="text-[10px] text-slate-400 font-mono">marcus.vance@aethervox.cloud · Super Admin</div>
-              </div>
-              <span className="text-[11px] font-mono text-cyan-600 dark:text-cyan-400 font-semibold group-hover:underline">
-                Use Credentials →
-              </span>
-            </button>
-          </div>
+          </form>  
         </div>
 
         {/* Client Portal Link */}

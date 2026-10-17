@@ -18,17 +18,19 @@ import {
   Layers,
   Database,
   Sliders,
+  BookOpen,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { MetricCard } from '../common/MetricCard';
 import { StatusBadge } from '../common/StatusBadge';
 import { Provider } from '../../types';
 import { formatINR } from '../../data/mockData';
+import { GpuProviderIntegrationGuide } from './GpuProviderIntegrationGuide';
 
 export const ProvidersView: React.FC = () => {
-  const { providers, createAlert, pingProviderApi, connectProviderApi, updateProviderCapacity, updateProvider } = useApp();
+  const { providers, createAlert, pingProviderApi, connectProviderApi, updateProviderCapacity, updateProvider, zeroOutGpuCounts } = useApp();
   const [selectedType, setSelectedType] = useState<'All GPU Clouds' | 'Hyperscale GPU Clouds' | 'Bare-Metal AI Datacenters' | 'Specialized AI Clouds'>('All GPU Clouds');
-  const [activeViewMode, setActiveViewMode] = useState<'contracts-matrix' | 'fleet-cards'>('contracts-matrix');
+  const [activeViewMode, setActiveViewMode] = useState<'contracts-matrix' | 'fleet-cards' | 'integration-guide'>('contracts-matrix');
   const [pingingId, setPingingId] = useState<string | null>(null);
 
   // Modal states
@@ -208,43 +210,72 @@ export const ProvidersView: React.FC = () => {
         </div>
       </div>
 
+      {/* Unintegrated GPU Status Notice Banner */}
+      {totalGpusPurchased === 0 && (
+        <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5 text-amber-900 dark:text-amber-200">
+            <span className="p-1.5 bg-amber-200/60 dark:bg-amber-900/60 rounded-lg text-sm">⚡</span>
+            <div>
+              <div className="font-bold">No Upstream GPU Providers Integrated (0 GPUs Active)</div>
+              <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                You have not connected upstream provider credentials yet. Node counts, fleet pools, and commitments are clean at 0.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => zeroOutGpuCounts()}
+              className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200 rounded text-xs font-semibold hover:bg-amber-100 dark:hover:bg-slate-700 transition-colors"
+            >
+              Zero Out Lingering Counts
+            </button>
+            <button
+              onClick={() => setActiveViewMode('integration-guide')}
+              className="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded text-xs font-bold transition-colors"
+            >
+              Open Integration Guide &amp; Tester
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Celerko Capacity & Provider Health KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
         <MetricCard
           label="Total Purchased GPUs"
-          value={`${totalGpusPurchased} Nodes`}
-          subValue="H100, H200, L40S, 4090"
-          highlight
-          badge="Purchased"
+          value={totalGpusPurchased > 0 ? `${totalGpusPurchased} Nodes` : '0 Nodes'}
+          subValue={totalGpusPurchased > 0 ? "H100, H200, L40S, 4090" : "Unintegrated (0)"}
+          highlight={totalGpusPurchased > 0}
+          badge={totalGpusPurchased > 0 ? "Purchased" : "Not Integrated"}
         />
         <MetricCard
           label="Allocated to Clients"
-          value={`${totalGpusAllocated} Nodes`}
-          subValue="Approved via Admin"
+          value={totalGpusAllocated > 0 ? `${totalGpusAllocated} Nodes` : '0 Nodes'}
+          subValue={totalGpusAllocated > 0 ? "Approved via Admin" : "No allocations"}
           badge="Allocated"
         />
         <MetricCard
           label="Available / Free GPUs"
-          value={`${totalGpusAvailable} Nodes`}
-          subValue="Ready for new allocation"
+          value={totalGpusAvailable > 0 ? `${totalGpusAvailable} Nodes` : '0 Nodes'}
+          subValue={totalGpusAvailable > 0 ? "Ready for new allocation" : "Awaiting API sync"}
           badge="Available"
         />
         <MetricCard
           label="API Status Online"
           value={`${operationalApisCount}/${providers.length}`}
-          subValue={`${avgUptime}% SLA Uptime`}
-          badge="API Health"
+          subValue={operationalApisCount > 0 ? `${avgUptime}% SLA Uptime` : "No active API links"}
+          badge={operationalApisCount > 0 ? "API Health" : "Offline"}
         />
         <MetricCard
           label="Nearest Contract End"
-          value={nearestExpiring ? nearestExpiring.contractEnd : '–'}
-          subValue={nearestExpiring ? `${nearestExpiring.name.split(' ')[0]} (${getDaysRemaining(nearestExpiring.contractEnd)}d left)` : '–'}
+          value={totalCommitment > 0 && nearestExpiring ? nearestExpiring.contractEnd : '–'}
+          subValue={totalCommitment > 0 && nearestExpiring ? `${nearestExpiring.name.split(' ')[0]} (${getDaysRemaining(nearestExpiring.contractEnd)}d left)` : 'No active contract'}
           badge="Renewal"
         />
         <MetricCard
           label="Monthly Commitment"
           value={formatINR(totalCommitment)}
-          subValue="Wholesale OPEX"
+          subValue={totalCommitment > 0 ? "Wholesale OPEX" : "₹0 (No Commitment)"}
           badge="Commitment"
         />
       </div>
@@ -274,6 +305,17 @@ export const ProvidersView: React.FC = () => {
             <Layers className="w-3.5 h-3.5 text-indigo-500" />
             <span>Fleet &amp; Capacity Cards</span>
           </button>
+          <button
+            onClick={() => setActiveViewMode('integration-guide')}
+            className={`px-3 py-1.5 rounded-md font-medium transition-all flex items-center gap-1.5 ${
+              activeViewMode === 'integration-guide'
+                ? 'bg-gradient-to-r from-cyan-600 to-indigo-600 text-white font-bold shadow-xs'
+                : 'text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-200'
+            }`}
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>GPU Integration Guide &amp; Tester</span>
+          </button>
         </div>
 
         <div className="flex items-center gap-2 overflow-x-auto">
@@ -293,8 +335,10 @@ export const ProvidersView: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Content: Contracts Matrix vs Fleet Cards */}
-      {activeViewMode === 'contracts-matrix' ? (
+      {/* Main Content: Integration Guide vs Contracts Matrix vs Fleet Cards */}
+      {activeViewMode === 'integration-guide' ? (
+        <GpuProviderIntegrationGuide />
+      ) : activeViewMode === 'contracts-matrix' ? (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
           <div className="p-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
@@ -345,7 +389,11 @@ export const ProvidersView: React.FC = () => {
                       <td className="py-2.5 px-3 font-mono text-slate-700 dark:text-slate-300">
                         <div className="font-medium text-slate-900 dark:text-slate-100">{provider.purchasedGpuModel}</div>
                         <div className="text-[10px] text-slate-400">
-                          {provider.purchasedGpuCount} Purchased · {provider.allocatedResourcesCount} Allocated
+                          {provider.purchasedGpuCount > 0 ? (
+                            `${provider.purchasedGpuCount} Purchased · ${provider.allocatedResourcesCount} Allocated`
+                          ) : (
+                            <span className="text-slate-400 font-sans italic">Not Integrated · 0 Nodes</span>
+                          )}
                         </div>
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono tabular-nums font-bold text-emerald-600 dark:text-emerald-400">
@@ -533,14 +581,20 @@ export const ProvidersView: React.FC = () => {
                         <KeyRound className="w-3 h-3 text-cyan-400" />
                         <span>Provider API Connector</span>
                       </span>
-                      <span className="text-[10px] text-emerald-400 bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-800">
-                        Backend Sync Active
-                      </span>
+                      {provider.upstreamKeyMasked ? (
+                        <span className="text-[10px] text-emerald-400 bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-800">
+                          Backend Sync Active
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700 font-sans">
+                          Not Integrated
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex justify-between text-[11px] items-center">
                       <span className="text-slate-400 font-sans">Endpoint:</span>
-                      <span className="text-cyan-300 truncate max-w-[210px]">{provider.apiEndpoint || 'https://api.upstream.gpu/v1'}</span>
+                      <span className="text-cyan-300 truncate max-w-[210px]">{provider.upstreamKeyMasked ? (provider.apiEndpoint || 'https://api.upstream.gpu/v1') : 'Not Configured'}</span>
                     </div>
 
                     <div className="flex justify-between text-[11px] items-center">
@@ -548,7 +602,7 @@ export const ProvidersView: React.FC = () => {
                         <Lock className="w-3 h-3 text-amber-400" />
                         <span>Upstream Secret Key:</span>
                       </span>
-                      <span className="text-amber-300 font-bold">{provider.upstreamKeyMasked || 'sk_live_••••••••9a21'}</span>
+                      <span className="text-amber-300 font-bold">{provider.upstreamKeyMasked || 'Not Configured (Unlinked)'}</span>
                     </div>
 
                     <div className="flex justify-between text-[10px] text-slate-400 pt-1">

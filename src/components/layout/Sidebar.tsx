@@ -19,7 +19,7 @@ import {
 import { useApp } from '../../context/AppContext';
 
 export const Sidebar: React.FC = () => {
-  const { activeTab, setActiveTab, pendingRequests, alerts, setIsClientPortalMode, currentUser, calculatedResaleMargin } = useApp();
+  const { activeTab, setActiveTab, pendingRequests, alerts, setIsClientPortalMode, currentUser, calculatedResaleMargin, showDatabaseTab } = useApp();
 
   const pendingCount = pendingRequests.filter(r => r.status === 'Pending').length;
   const criticalCount = alerts.filter(a => !a.resolved && a.severity === 'Critical').length;
@@ -41,13 +41,14 @@ export const Sidebar: React.FC = () => {
     { id: 'audit', label: 'Audit Logs & IP Trail', icon: ShieldCheck },
     { id: 'users', label: 'Users & Passwords', icon: Lock },
     { id: 'bonus-tools', label: 'Calculators & Forecast', icon: Sparkles },
-    ...(currentUser.role === 'Super Admin'
+    ...(showDatabaseTab && currentUser.role === 'Super Admin'
       ? [{ id: 'database', label: 'SQL Schema (Read-Only)', icon: Database }]
       : []),
   ];
 
   const canAccess = (tabId: string): boolean => {
-    if (currentUser.role === 'Super Admin') return true;
+    if (tabId === 'database' && !showDatabaseTab) return false;
+    if (currentUser.role === 'Super Admin') return tabId === 'database' ? showDatabaseTab : true;
     if (!currentUser.permissions) return true;
     const permMap: Record<string, boolean | undefined> = {
       dashboard: currentUser.permissions.dashboard,
@@ -62,7 +63,7 @@ export const Sidebar: React.FC = () => {
       audit: currentUser.permissions.audit,
       users: currentUser.permissions.users,
       'bonus-tools': currentUser.permissions.bonusTools,
-      database: Boolean(currentUser.permissions.database && (currentUser.role as string) === 'Super Admin'),
+      database: Boolean(showDatabaseTab && currentUser.permissions.database && (currentUser.role as string) === 'Super Admin'),
     };
     return permMap[tabId] !== false;
   };

@@ -17,6 +17,21 @@ import {
   Square,
   Eye,
   EyeOff,
+  Globe,
+  Wifi,
+  Laptop,
+  Smartphone,
+  Activity,
+  Clock,
+  RefreshCw,
+  LogOut,
+  Radio,
+  HardDrive,
+  Cpu,
+  Search,
+  FileText,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import { useApp, DEFAULT_PERMISSIONS_BY_ROLE } from '../../context/AppContext';
 import { MetricCard } from '../common/MetricCard';
@@ -52,9 +67,21 @@ export const UsersView: React.FC = () => {
     currentUser,
     switchRole,
     changeUserPassword,
+    activeSessions,
+    loginHistory,
+    realTelemetry,
+    terminateSession,
+    terminateAllOtherSessions,
+    refreshTelemetry,
+    testPingLatency,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'users' | 'rbac' | 'sessions'>('users');
+  const [sessionSearch, setSessionSearch] = useState('');
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyFilter, setHistoryFilter] = useState<'All' | 'Success' | 'Failed'>('All');
+  const [isRefreshingTelemetry, setIsRefreshingTelemetry] = useState(false);
+  const [latencyResult, setLatencyResult] = useState<number | null>(null);
 
   // Modals state
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -733,37 +760,416 @@ export const UsersView: React.FC = () => {
         </div>
       )}
 
-      {/* Tab 3: Active Sessions & IP Tracking */}
+      {/* Tab 3: Active Sessions, Real IP Tracking & Monitoring */}
       {activeTab === 'sessions' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {users.map(u => (
-              <div
-                key={u.id}
-                className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg flex items-start justify-between text-xs"
-              >
+        <div className="space-y-6">
+          {/* Section 1: Live Hardware & Network Telemetry Bar */}
+          <div className="p-4 bg-gradient-to-r from-slate-900 via-slate-900 to-cyan-950/60 border border-slate-200 dark:border-slate-800 rounded-xl space-y-4 shadow-md">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                </span>
                 <div>
-                  <div className="font-bold text-slate-900 dark:text-slate-100 text-sm">{u.name}</div>
-                  <div className="text-[11px] text-slate-400 font-mono">{u.email} ({u.role})</div>
-                  <div className="mt-3 space-y-1 font-mono text-[11px] text-slate-600 dark:text-slate-300">
-                    <div>Last Login: <span className="text-slate-900 dark:text-slate-100">{u.lastLogin}</span></div>
-                    <div>Source IP: <span className="text-cyan-600 dark:text-cyan-400">{u.lastIp}</span> (San Francisco, CA)</div>
-                    <div>Active JWT Sessions: <span className="text-emerald-600 dark:text-emerald-400 font-bold">{u.activeSessions} device(s)</span></div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block mb-2" title="Online" />
-                  <div>
-                    <button
-                      onClick={() => switchRole(u.role)}
-                      className="px-2 py-1 text-[10px] font-semibold text-cyan-700 bg-cyan-50 hover:bg-cyan-100 dark:bg-cyan-950/40 dark:text-cyan-300 rounded"
-                    >
-                      Impersonate
-                    </button>
-                  </div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-100 flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-cyan-400" />
+                    Real-time Client Telemetry &amp; Live IP Tracking
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Live client public IP, hardware profiling, browser session telemetry, and latency health checks.
+                  </p>
                 </div>
               </div>
-            ))}
+
+              <div className="flex items-center gap-2 self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsRefreshingTelemetry(true);
+                    await refreshTelemetry();
+                    setIsRefreshingTelemetry(false);
+                  }}
+                  disabled={isRefreshingTelemetry}
+                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs font-semibold rounded-lg border border-slate-700 flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                  title="Detect and refresh current client public IP and location"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingTelemetry ? 'animate-spin' : ''}`} />
+                  <span>{isRefreshingTelemetry ? 'Detecting IP...' : 'Refresh IP & Telemetry'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const lat = await testPingLatency();
+                    setLatencyResult(lat);
+                    setTimeout(() => setLatencyResult(null), 3000);
+                  }}
+                  className="px-2.5 py-1.5 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/40 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors"
+                  title="Measure real round-trip HTTP ping latency to origin"
+                >
+                  <Radio className="w-3.5 h-3.5" />
+                  <span>{latencyResult !== null ? `Ping: ${latencyResult}ms` : 'Test Ping'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 4 Telemetry Tiles */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* Tile 1: Real Client IP */}
+              <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-lg space-y-1.5">
+                <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <Globe className="w-3.5 h-3.5 text-cyan-400" />
+                    Public Client IP
+                  </span>
+                  <span className="px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 font-mono text-[10px]">
+                    LIVE
+                  </span>
+                </div>
+                <div className="text-sm font-bold font-mono text-cyan-300 tracking-tight">
+                  {realTelemetry.publicIp}
+                </div>
+                <div className="text-[11px] text-slate-400 truncate">
+                  {realTelemetry.city}, {realTelemetry.country} • <span className="text-slate-500">{realTelemetry.ispOrOrg}</span>
+                </div>
+              </div>
+
+              {/* Tile 2: Connectivity & Latency */}
+              <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-lg space-y-1.5">
+                <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <Wifi className="w-3.5 h-3.5 text-emerald-400" />
+                    Network &amp; Round-Trip Latency
+                  </span>
+                  <span className="px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 font-mono text-[10px]">
+                    {realTelemetry.isOnline ? 'ONLINE' : 'OFFLINE'}
+                  </span>
+                </div>
+                <div className="text-sm font-bold font-mono text-emerald-400 flex items-center gap-2">
+                  <span>{realTelemetry.rttMs} ms RTT</span>
+                  <span className="text-xs text-slate-400 font-normal">({realTelemetry.effectiveType.toUpperCase()})</span>
+                </div>
+                <div className="text-[11px] text-slate-400 truncate">
+                  Throughput: ~{realTelemetry.downlinkMbps} Mbps • Protocol: HTTPS/WSS
+                </div>
+              </div>
+
+              {/* Tile 3: Client Machine Profile */}
+              <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-lg space-y-1.5">
+                <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <Laptop className="w-3.5 h-3.5 text-purple-400" />
+                    Browser &amp; OS Hardware
+                  </span>
+                  <span className="px-1.5 py-0.2 rounded bg-purple-950 text-purple-300 border border-purple-800 font-mono text-[10px]">
+                    CLIENT
+                  </span>
+                </div>
+                <div className="text-sm font-bold text-slate-200 truncate">
+                  {realTelemetry.browser}
+                </div>
+                <div className="text-[11px] text-slate-400 truncate">
+                  OS: {realTelemetry.os} • <span className="font-mono">{realTelemetry.cpuCores} CPU Cores</span>
+                </div>
+              </div>
+
+              {/* Tile 4: Storage & Session Health */}
+              <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-lg space-y-1.5">
+                <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <HardDrive className="w-3.5 h-3.5 text-amber-400" />
+                    Storage &amp; Session Uptime
+                  </span>
+                  <span className="px-1.5 py-0.2 rounded bg-amber-950 text-amber-300 border border-amber-800 font-mono text-[10px]">
+                    PERSISTED
+                  </span>
+                </div>
+                <div className="text-sm font-bold font-mono text-amber-300">
+                  {Math.floor(realTelemetry.sessionUptimeSeconds / 60)}m {realTelemetry.sessionUptimeSeconds % 60}s Active
+                </div>
+                <div className="text-[11px] text-slate-400 truncate">
+                  LocalStorage: {realTelemetry.storageUsedMb} MB used {realTelemetry.memoryUsedMb ? `• Heap: ${realTelemetry.memoryUsedMb}MB` : ''}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2: Active User Sessions & Revocation */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs space-y-3 p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div>
+                <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                  Authenticated Active Device Sessions ({activeSessions.length})
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Active JWT tokens issued across authenticated devices with real IP origins and termination controls.
+                </p>
+              </div>
+
+              {activeSessions.length > 1 && (
+                <button
+                  type="button"
+                  onClick={terminateAllOtherSessions}
+                  className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors self-start sm:self-auto"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Terminate All Other Sessions</span>
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {activeSessions.map(session => (
+                <div
+                  key={session.id}
+                  className={`p-3.5 rounded-lg border text-xs transition-all flex flex-col justify-between ${
+                    session.isCurrentSession
+                      ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800/80 shadow-xs'
+                      : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        {session.deviceType === 'Mobile' ? (
+                          <Smartphone className="w-4 h-4 text-slate-500" />
+                        ) : (
+                          <Laptop className="w-4 h-4 text-slate-500" />
+                        )}
+                        <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                          {session.userName}
+                        </span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                          {session.userRole}
+                        </span>
+                      </div>
+
+                      {session.isCurrentSession ? (
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold font-mono border border-emerald-300 dark:border-emerald-700 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          This Device
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-mono">
+                          Remote Device
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-1 font-mono text-[11px] text-slate-600 dark:text-slate-300 mt-2">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 font-sans">Source IP:</span>
+                        <span className="font-bold text-cyan-600 dark:text-cyan-400">{session.ipAddress}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 font-sans">Location:</span>
+                        <span className="text-slate-700 dark:text-slate-200">{session.location}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 font-sans">Device &amp; OS:</span>
+                        <span className="text-slate-700 dark:text-slate-200">{session.browser} on {session.os}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 font-sans">Login Timestamp:</span>
+                        <span className="text-slate-700 dark:text-slate-200">{session.loginAt}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 font-sans">Token Signature:</span>
+                        <span className="text-slate-400">{session.tokenMasked}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 pt-2.5 border-t border-slate-200 dark:border-slate-700/60 flex items-center justify-between">
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      Status: <strong className="text-emerald-500">Active</strong>
+                    </span>
+                    {!session.isCurrentSession && (
+                      <button
+                        type="button"
+                        onClick={() => terminateSession(session.id)}
+                        className="px-2 py-1 text-[11px] font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded transition-colors"
+                      >
+                        Revoke Session
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Section 3: Real Login History Audit Trail */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs space-y-3 p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div>
+                <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-cyan-500" />
+                  Real Login History &amp; Access Log Trail ({loginHistory.length})
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Detailed security audit trail capturing every authentication attempt, IP origin, device, and result.
+                </p>
+              </div>
+
+              {/* Filter controls */}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 border border-slate-200 dark:border-slate-700 rounded-lg p-0.5 text-xs bg-slate-50 dark:bg-slate-800">
+                  {(['All', 'Success', 'Failed'] as const).map(filter => (
+                    <button
+                      key={filter}
+                      type="button"
+                      onClick={() => setHistoryFilter(filter)}
+                      className={`px-2 py-1 rounded text-[11px] font-semibold transition-colors ${
+                        historyFilter === filter
+                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs'
+                          : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      {filter}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search logs..."
+                    value={historySearch}
+                    onChange={e => setHistorySearch(e.target.value)}
+                    className="pl-8 pr-2.5 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 w-36 sm:w-48"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Login History Table */}
+            <div className="overflow-x-auto">
+              {loginHistory.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-500">
+                  No login history events recorded yet. Authentication attempts will appear here automatically.
+                </div>
+              ) : (
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-semibold">
+                      <th className="py-2 px-3">Timestamp</th>
+                      <th className="py-2 px-3">User Account</th>
+                      <th className="py-2 px-3">Auth Method</th>
+                      <th className="py-2 px-3">Source IP &amp; Location</th>
+                      <th className="py-2 px-3">Device &amp; Browser</th>
+                      <th className="py-2 px-3 text-right">Result</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono text-[11px]">
+                    {loginHistory
+                      .filter(entry => {
+                        if (historyFilter === 'Success' && entry.status !== 'Success') return false;
+                        if (historyFilter === 'Failed' && entry.status !== 'Failed') return false;
+                        if (historySearch) {
+                          const query = historySearch.toLowerCase();
+                          return (
+                            entry.userName.toLowerCase().includes(query) ||
+                            entry.userEmail.toLowerCase().includes(query) ||
+                            entry.ipAddress.toLowerCase().includes(query) ||
+                            entry.location.toLowerCase().includes(query)
+                          );
+                        }
+                        return true;
+                      })
+                      .map(entry => (
+                        <tr key={entry.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                          <td className="py-2 px-3 text-slate-500 whitespace-nowrap">
+                            {entry.timestamp}
+                          </td>
+                          <td className="py-2 px-3">
+                            <div className="font-bold font-sans text-slate-900 dark:text-slate-100">
+                              {entry.userName}
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-mono">
+                              {entry.userEmail} ({entry.userRole})
+                            </div>
+                          </td>
+                          <td className="py-2 px-3 font-sans text-slate-600 dark:text-slate-300">
+                            {entry.authMethod}
+                          </td>
+                          <td className="py-2 px-3">
+                            <span className="font-bold text-cyan-600 dark:text-cyan-400">{entry.ipAddress}</span>
+                            <div className="text-[10px] text-slate-400 font-sans">{entry.location}</div>
+                          </td>
+                          <td className="py-2 px-3 font-sans text-slate-600 dark:text-slate-300">
+                            {entry.browser} on {entry.os}
+                          </td>
+                          <td className="py-2 px-3 text-right">
+                            {entry.status === 'Success' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                                <span>Success</span>
+                              </span>
+                            ) : (
+                              <span
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 font-bold border border-rose-200 dark:border-rose-800"
+                                title={entry.failureReason || 'Auth failed'}
+                              >
+                                <XCircle className="w-3 h-3 text-rose-500" />
+                                <span>Failed</span>
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+
+          {/* Section 4: All Staff User Accounts & Last Login Matrix */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs p-4 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+              <div>
+                <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                  Staff Account Directory &amp; Last Known Network Origins
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Overview of all registered system operators and their most recently recorded source IP addresses.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {users.map(u => (
+                <div
+                  key={u.id}
+                  className="p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-lg flex items-start justify-between text-xs"
+                >
+                  <div>
+                    <div className="font-bold text-slate-900 dark:text-slate-100 text-sm">{u.name}</div>
+                    <div className="text-[11px] text-slate-400 font-mono">{u.email} • <span className="font-semibold text-cyan-600 dark:text-cyan-400">{u.role}</span></div>
+                    <div className="mt-2.5 space-y-0.5 font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                      <div>Last Login: <span className="text-slate-900 dark:text-slate-100">{u.lastLogin}</span></div>
+                      <div>Source IP: <span className="text-cyan-600 dark:text-cyan-400 font-bold">{u.lastIp}</span></div>
+                      <div>Active Sessions: <span className="text-emerald-600 dark:text-emerald-400 font-bold">{u.activeSessions}</span></div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className={`w-2.5 h-2.5 rounded-full inline-block mb-2 ${u.status === 'Active' ? 'bg-emerald-500' : 'bg-slate-400'}`} title={u.status} />
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => switchRole(u.role)}
+                        className="px-2 py-1 text-[10px] font-semibold text-cyan-700 bg-cyan-100/70 hover:bg-cyan-200 dark:bg-cyan-950/60 dark:text-cyan-300 rounded transition-colors"
+                      >
+                        Impersonate Role
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}

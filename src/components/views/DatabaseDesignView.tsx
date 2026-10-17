@@ -12,13 +12,37 @@ import {
   Lock,
   ShieldCheck,
   AlertTriangle,
+  Trash2,
+  RefreshCw,
+  EyeOff,
+  Sliders,
+  CheckCircle2,
+  ChevronRight,
+  AlertOctagon,
+  X,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export const DatabaseDesignView: React.FC = () => {
-  const { currentUser } = useApp();
-  const [activeTab, setActiveTab] = useState<'sql-schema' | 'sql-runner' | 'prisma' | 'api' | 'architecture'>('sql-schema');
+  const {
+    currentUser,
+    showDatabaseTab,
+    setShowDatabaseTab,
+    wipeEntireDatabase,
+    zeroOutGpuCounts,
+    restoreDemoData,
+    clients,
+    gpus,
+    dids,
+    invoices,
+    providers,
+    apiKeys,
+  } = useApp();
+  const [activeTab, setActiveTab] = useState<'database-ops' | 'sql-schema' | 'sql-runner' | 'prisma' | 'api' | 'architecture'>('database-ops');
   const [copied, setCopied] = useState(false);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const [showWipeModal, setShowWipeModal] = useState(false);
+  const [showZeroGpuModal, setShowZeroGpuModal] = useState(false);
 
   // Read-only SQL templates state
   const [selectedPresetQuery, setSelectedPresetQuery] = useState('spread_by_client');
@@ -515,9 +539,26 @@ ORDER BY channel_saturation_percent DESC;`,
         </div>
       </div>
 
+      {/* Action Notification Toast */}
+      {actionNotice && (
+        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 rounded-xl text-emerald-800 dark:text-emerald-200 text-xs flex items-center justify-between shadow-sm animate-fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+            <span className="font-medium">{actionNotice}</span>
+          </div>
+          <button
+            onClick={() => setActionNotice(null)}
+            className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-900"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2 text-xs overflow-x-auto">
         {[
+          { id: 'database-ops', label: 'Database Reset & Removal Actions (Danger Zone)' },
           { id: 'sql-schema', label: 'PostgreSQL Schema DDL (Read-Only)' },
           { id: 'sql-runner', label: 'SQL Query Templates (Read-Only)' },
           { id: 'prisma', label: 'Prisma Models (schema.prisma)' },
@@ -529,7 +570,9 @@ ORDER BY channel_saturation_percent DESC;`,
             onClick={() => setActiveTab(tab.id as any)}
             className={`px-3 py-1.5 rounded font-medium transition-colors whitespace-nowrap ${
               activeTab === tab.id
-                ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 font-semibold'
+                ? tab.id === 'database-ops'
+                  ? 'bg-rose-600 text-white font-bold shadow-xs'
+                  : 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 font-semibold'
                 : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
             }`}
           >
@@ -537,6 +580,235 @@ ORDER BY channel_saturation_percent DESC;`,
           </button>
         ))}
       </div>
+
+      {/* Tab 0: Database Reset & Removal Operations */}
+      {activeTab === 'database-ops' && (
+        <div className="space-y-4">
+          {/* Top Summary Banner */}
+          <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
+            <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
+              <Database className="w-4 h-4 text-cyan-500" />
+              <span>Database Management &amp; Removal Controls</span>
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              Use the tools below to remove this Database tab from the sidebar menu, wipe all saved database records down to a zero clean slate, or zero out GPU provider counts.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Card 1: Remove Database Tab from Navigation */}
+            <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col justify-between space-y-3 shadow-xs">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="font-bold text-slate-900 dark:text-slate-100 text-xs flex items-center gap-1.5">
+                    <EyeOff className="w-4 h-4 text-cyan-500" />
+                    <span>Remove Database Tab from Sidebar</span>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    showDatabaseTab
+                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                      : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300 dark:border-slate-700'
+                  }`}>
+                    {showDatabaseTab ? 'Visible in Navigation' : 'Hidden / Removed'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Hides the &quot;SQL Schema (Read-Only)&quot; tab from the left sidebar navigation menu. This setting persists across browser refreshes via localStorage.
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !showDatabaseTab;
+                    setShowDatabaseTab(next);
+                    setActionNotice(next ? 'Database tab has been restored to sidebar navigation.' : 'Database tab has been removed from sidebar navigation.');
+                    setTimeout(() => setActionNotice(null), 4000);
+                  }}
+                  className={`w-full py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                    showDatabaseTab
+                      ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                      : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                  }`}
+                >
+                  <EyeOff className="w-3.5 h-3.5" />
+                  <span>{showDatabaseTab ? 'Remove Database Tab from Sidebar Now' : 'Restore Database Tab to Sidebar'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Card 2: Zero Out GPU Provider Counts */}
+            <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col justify-between space-y-3 shadow-xs">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="font-bold text-slate-900 dark:text-slate-100 text-xs flex items-center gap-1.5">
+                    <Sliders className="w-4 h-4 text-amber-500" />
+                    <span>Zero Out GPU Provider Counts</span>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                    Unintegrated Counts
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  If you haven&apos;t integrated GPU providers yet and still see counts or nodes, click this to reset all provider purchased, allocated, and available counts to 0.
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    zeroOutGpuCounts();
+                    setActionNotice('All GPU provider counts and hardware inventory have been zeroed out (0 GPUs).');
+                    setTimeout(() => setActionNotice(null), 4000);
+                  }}
+                  className="w-full py-2 px-3 bg-amber-50 hover:bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                >
+                  <Sliders className="w-3.5 h-3.5" />
+                  <span>Zero Out All GPU Counts Now</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Card 3: Wipe Entire Database (Clean Slate) */}
+            <div className="p-4 bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-900/60 rounded-xl flex flex-col justify-between space-y-3 shadow-xs bg-rose-50/20 dark:bg-rose-950/10">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="font-bold text-rose-800 dark:text-rose-300 text-xs flex items-center gap-1.5">
+                    <Trash2 className="w-4 h-4 text-rose-500" />
+                    <span>Wipe All Database Records (Clean Slate)</span>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-300 dark:border-rose-800">
+                    Danger Zone
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                  Deletes all records across all database tables (clients, GPUs, DIDs, invoices, payments, requests, audit logs, sessions) and flushes localStorage. Leaves a completely clean production canvas.
+                </p>
+                <div className="mt-2 grid grid-cols-4 gap-1.5 text-center font-mono text-[10px]">
+                  <div className="p-1.5 bg-slate-100 dark:bg-slate-800 rounded">Clients: <strong>{clients.length}</strong></div>
+                  <div className="p-1.5 bg-slate-100 dark:bg-slate-800 rounded">GPUs: <strong>{gpus.length}</strong></div>
+                  <div className="p-1.5 bg-slate-100 dark:bg-slate-800 rounded">DIDs: <strong>{dids.length}</strong></div>
+                  <div className="p-1.5 bg-slate-100 dark:bg-slate-800 rounded">Invoices: <strong>{invoices.length}</strong></div>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-rose-100 dark:border-rose-900/40">
+                <button
+                  type="button"
+                  onClick={() => setShowWipeModal(true)}
+                  className="w-full py-2 px-3 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-xs"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Wipe All Database Records (0 Records)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Card 4: Restore Sample Demo Records */}
+            <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col justify-between space-y-3 shadow-xs">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="font-bold text-slate-900 dark:text-slate-100 text-xs flex items-center gap-1.5">
+                    <RefreshCw className="w-4 h-4 text-cyan-500" />
+                    <span>Restore Sample Dataset</span>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300 border border-cyan-300 dark:border-cyan-800">
+                    Sample Data
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Need sample records for demonstration or testing? Click below to restore sample wholesale clients, Indian DID numbers, and test invoices.
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    restoreDemoData();
+                    setActionNotice('Sample dataset successfully restored.');
+                    setTimeout(() => setActionNotice(null), 4000);
+                  }}
+                  className="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Restore Sample Dataset</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Developer Guide: Permanent Codebase Removal */}
+          <div className="p-4 bg-slate-900 text-slate-300 border border-slate-800 rounded-xl space-y-3 text-xs">
+            <div className="flex items-center gap-2 text-cyan-400 font-bold">
+              <Code2 className="w-4 h-4" />
+              <span>How to Remove the Database Feature from the Codebase Permanently</span>
+            </div>
+            <p className="text-slate-400 text-[11px] leading-relaxed">
+              If you want to permanently delete the Database view from your source code so it is completely excluded from your build:
+            </p>
+            <div className="space-y-2 font-mono text-[11px]">
+              <div className="p-2.5 bg-slate-950 rounded border border-slate-800 space-y-1">
+                <span className="text-cyan-400 font-sans font-semibold block text-[11px]">1. Remove Route in src/App.tsx</span>
+                <span className="text-slate-500">// Remove the database case:</span>
+                <div className="text-rose-400">- case &apos;database&apos;: return &lt;DatabaseDesignView /&gt;;</div>
+              </div>
+
+              <div className="p-2.5 bg-slate-950 rounded border border-slate-800 space-y-1">
+                <span className="text-cyan-400 font-sans font-semibold block text-[11px]">2. Remove from Navigation in src/components/layout/Sidebar.tsx</span>
+                <span className="text-slate-500">// Remove the database entry from secondaryItems:</span>
+                <div className="text-rose-400">- ...[{`{ id: 'database', label: 'SQL Schema (Read-Only)', icon: Database }`}]</div>
+              </div>
+
+              <div className="p-2.5 bg-slate-950 rounded border border-slate-800 space-y-1">
+                <span className="text-cyan-400 font-sans font-semibold block text-[11px]">3. Delete Component File</span>
+                <div className="text-emerald-400 font-sans">rm src/components/views/DatabaseDesignView.tsx</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Wipe Confirmation Modal */}
+          {showWipeModal && (
+            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+              <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-rose-300 dark:border-rose-900 rounded-xl p-5 shadow-2xl space-y-4">
+                <div className="flex items-center gap-2.5 text-rose-600 dark:text-rose-400 font-bold text-sm">
+                  <AlertOctagon className="w-5 h-5 shrink-0" />
+                  <span>Confirm Database Wipe</span>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Are you sure you want to wipe all records? This will permanently delete all {clients.length} clients, {gpus.length} GPUs, {dids.length} DIDs, and {invoices.length} invoices, and clear browser localStorage.
+                </p>
+                <div className="p-2.5 bg-rose-50 dark:bg-rose-950/40 rounded border border-rose-200 dark:border-rose-800 text-[11px] text-rose-800 dark:text-rose-300">
+                  Only the default Super Administrator account will be kept for login. All other tables will be reset to 0 records.
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowWipeModal(false)}
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded text-xs font-semibold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      wipeEntireDatabase();
+                      setShowWipeModal(false);
+                      setActionNotice('Entire database wiped successfully. All tables are now clean with 0 records.');
+                      setTimeout(() => setActionNotice(null), 5000);
+                    }}
+                    className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded text-xs font-bold shadow-xs"
+                  >
+                    Yes, Wipe Entire Database
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tab 1: PostgreSQL DDL Schema */}
       {activeTab === 'sql-schema' && (

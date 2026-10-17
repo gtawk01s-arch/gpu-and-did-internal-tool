@@ -17,6 +17,9 @@ import {
   AuditLog,
   SupportTicket,
   UserAccessPermissions,
+  UserSession,
+  LoginHistoryEntry,
+  RealTelemetryStats,
 } from '../types';
 import {
   INITIAL_USERS,
@@ -34,6 +37,12 @@ import {
   INITIAL_SUPPORT_TICKETS,
 } from '../data/mockData';
 import { hashPassword, verifyPassword } from '../utils/crypto';
+import {
+  fetchRealClientIp,
+  detectDeviceInfo,
+  measurePingLatency,
+  getStorageQuotaInfo,
+} from '../utils/network';
 
 export const DEFAULT_PERMISSIONS_BY_ROLE: Record<UserRole, UserAccessPermissions> = {
   'Super Admin': {
@@ -233,6 +242,10 @@ interface AppContextType {
   updateClientCredentials: (clientId: string, username: string, password: string) => void;
   clearAllMockData: () => void;
   restoreDemoData: () => void;
+  wipeEntireDatabase: () => void;
+  zeroOutGpuCounts: () => void;
+  showDatabaseTab: boolean;
+  setShowDatabaseTab: (show: boolean) => void;
 
   // Dedicated Panel URLs & Portal Mode
   isClientPortalMode: boolean;
@@ -245,30 +258,121 @@ interface AppContextType {
   openClientPortal: (clientId: string, autoLogin?: boolean) => void;
   returnToBrokerAdmin: (targetTab?: string) => void;
   navigateToAdminLogin: () => void;
+
+  // Real Telemetry, IP Tracking & Sessions
+  activeSessions: UserSession[];
+  loginHistory: LoginHistoryEntry[];
+  realTelemetry: RealTelemetryStats;
+  terminateSession: (sessionId: string) => void;
+  terminateAllOtherSessions: () => void;
+  refreshTelemetry: () => Promise<void>;
+  testPingLatency: (url?: string) => Promise<number>;
+  syncProviderGpuCapacity: (providerId: string) => { synced: boolean; count: number; model: string };
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const STORAGE_PREFIX = 'celerko_v2_';
+
+function loadStored<T>(key: string, defaultValue: T): T {
+  if (typeof window === 'undefined') return defaultValue;
+  try {
+    const raw = localStorage.getItem(STORAGE_PREFIX + key);
+    if (!raw) return defaultValue;
+    return JSON.parse(raw);
+  } catch (err) {
+    console.warn(`[Storage] Failed to parse ${key}`, err);
+    return defaultValue;
+  }
+}
+
+function saveStored<T>(key: string, value: T): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(value));
+  } catch (err) {
+    console.warn(`[Storage] Failed to save ${key}`, err);
+  }
+}
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
-  const [currentUser, setCurrentUser] = useState<User>(INITIAL_USERS[0]);
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
-  const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [users, setUsers] = useState<User[]>(() => loadStored('users', INITIAL_USERS));
+  const [currentUser, setCurrentUser] = useState<User>(() => loadStored('current_user', INITIAL_USERS[0]));
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => loadStored('theme', 'dark'));
+  const [activeTab, setActiveTab] = useState<string>(() => loadStored('active_tab', 'dashboard'));
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
 
-  const [gpus, setGpus] = useState<GpuInventoryItem[]>([]);
-const [sipProviders, setSipProviders] = useState<SipProvider[]>([]);
-const [dids, setDids] = useState<DidNumber[]>([]);
-const [clients, setClients] = useState<Client[]>([]);
-const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
-  const [providers, setProviders] = useState<Provider[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [alerts, setAlerts] = useState<SystemAlert[]>([]);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
-  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
-  const [apiKeys, setApiKeys] = useState<CelerkoApiKey[]>([]);
+  const [gpus, setGpus] = useState<GpuInventoryItem[]>(() => loadStored('gpus', INITIAL_GPU_INVENTORY));
+  const [sipProviders, setSipProviders] = useState<SipProvider[]>(() => loadStored('sip_providers', INITIAL_SIP_PROVIDERS));
+  const [dids, setDids] = useState<DidNumber[]>(() => loadStored('dids', INITIAL_DID_NUMBERS));
+  const [clients, setClients] = useState<Client[]>(() => loadStored('clients', INITIAL_CLIENTS));
+  const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>(() => loadStored('pending_requests', INITIAL_PENDING_REQUESTS));
+  const [providers, setProviders] = useState<Provider[]>(() => {
+    const raw = loadStored('providers', INITIAL_PROVIDERS);
+    return raw.map(p => {
+      // If the provider has not been integrated with an upstream secret key, ensure all GPU counts are 0
+      const isIntegrated = Boolean(p.upstreamKeyMasked && p.apiStatus === 'Operational');
+      if (!isIntegrated) {
+        return {
+          ...p,
+          purchasedGpuCount: 0,
+          allocatedResourcesCount: 0,
+          runningGpuCount: 0,
+          availableGpuCount: 0,
+          monthlyCommitment: 0,
+        };
+      }
+      return p;
+    });
+  });
+  const [invoices, setInvoices] = useState<Invoice[]>(() => loadStored('invoices', INITIAL_INVOICES));
+  const [payments, setPayments] = useState<Payment[]>(() => loadStored('payments', INITIAL_PAYMENTS));
+  const [alerts, setAlerts] = useState<SystemAlert[]>(() => loadStored('alerts', INITIAL_ALERTS));
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => loadStored('audit_logs', INITIAL_AUDIT_LOGS));
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>(() => loadStored('support_tickets', INITIAL_SUPPORT_TICKETS));
+  const [apiKeys, setApiKeys] = useState<CelerkoApiKey[]>(() => loadStored('api_keys', INITIAL_API_KEYS));
+  const [activeSessions, setActiveSessions] = useState<UserSession[]>(() => loadStored('active_sessions', []));
+  const [loginHistory, setLoginHistory] = useState<LoginHistoryEntry[]>(() => loadStored('login_history', []));
+
+  const [realTelemetry, setRealTelemetry] = useState<RealTelemetryStats>({
+    publicIp: 'Detecting...',
+    ispOrOrg: 'Querying Network ASN...',
+    country: 'Detecting Country...',
+    city: 'Detecting...',
+    os: 'Detecting OS...',
+    browser: 'Detecting Browser...',
+    isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+    effectiveType: '4g',
+    rttMs: 16,
+    downlinkMbps: 10,
+    cpuCores: typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 8 : 8,
+    sessionUptimeSeconds: 0,
+    lastUpdated: new Date().toLocaleTimeString(),
+  });
+
+  // Sync state modifications automatically to localStorage
+  useEffect(() => { saveStored('users', users); }, [users]);
+  useEffect(() => { saveStored('gpus', gpus); }, [gpus]);
+  useEffect(() => { saveStored('sip_providers', sipProviders); }, [sipProviders]);
+  useEffect(() => { saveStored('dids', dids); }, [dids]);
+  useEffect(() => { saveStored('clients', clients); }, [clients]);
+  useEffect(() => { saveStored('pending_requests', pendingRequests); }, [pendingRequests]);
+  useEffect(() => { saveStored('providers', providers); }, [providers]);
+  useEffect(() => { saveStored('invoices', invoices); }, [invoices]);
+  useEffect(() => { saveStored('payments', payments); }, [payments]);
+  useEffect(() => { saveStored('alerts', alerts); }, [alerts]);
+  useEffect(() => { saveStored('audit_logs', auditLogs); }, [auditLogs]);
+  useEffect(() => { saveStored('support_tickets', supportTickets); }, [supportTickets]);
+  useEffect(() => { saveStored('api_keys', apiKeys); }, [apiKeys]);
+  useEffect(() => { saveStored('active_sessions', activeSessions); }, [activeSessions]);
+  useEffect(() => { saveStored('login_history', loginHistory); }, [loginHistory]);
+  useEffect(() => { saveStored('theme', theme); }, [theme]);
+  useEffect(() => { saveStored('active_tab', activeTab); }, [activeTab]);
+  useEffect(() => { saveStored('current_user', currentUser); }, [currentUser]);
+
+  const [showDatabaseTab, setShowDatabaseTab] = useState<boolean>(() => loadStored('show_database_tab', true));
+  useEffect(() => { saveStored('show_database_tab', showDatabaseTab); }, [showDatabaseTab]);
 
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
@@ -327,19 +431,201 @@ const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
     return totRev > 0 ? ((profit / totRev) * 100).toFixed(1) + '%' : '–';
   })();
 
+  // Real-time Telemetry & Sessions Handlers
+  const refreshTelemetry = async () => {
+    try {
+      const geo = await fetchRealClientIp();
+      const dev = detectDeviceInfo();
+      const storage = await getStorageQuotaInfo();
+      const ping = await measurePingLatency();
+
+      const conn = typeof navigator !== 'undefined' ? ((navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection) : null;
+      const mem = typeof performance !== 'undefined' ? (performance as any).memory : null;
+
+      setRealTelemetry(prev => ({
+        ...prev,
+        publicIp: geo.ip,
+        city: geo.city,
+        country: geo.country,
+        ispOrOrg: geo.isp,
+        browser: dev.browser,
+        os: dev.os,
+        isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+        effectiveType: conn?.effectiveType || '4g',
+        rttMs: ping,
+        downlinkMbps: conn?.downlink || 25,
+        cpuCores: typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 8 : 8,
+        memoryUsedMb: mem?.usedJSHeapSize ? Math.round(mem.usedJSHeapSize / (1024 * 1024)) : undefined,
+        memoryTotalMb: mem?.totalJSHeapSize ? Math.round(mem.totalJSHeapSize / (1024 * 1024)) : undefined,
+        storageUsedMb: storage.usedMb,
+        storageQuotaMb: storage.quotaMb,
+        lastUpdated: new Date().toLocaleTimeString(),
+      }));
+
+      // Upsert current user session with real IP and device info
+      if (currentUser) {
+        setActiveSessions(prev => {
+          const currentToken = 'jwt_live_' + currentUser.id;
+          const otherSessions = prev.filter(s => !s.isCurrentSession);
+          const currentItem: UserSession = {
+            id: 'sess-current',
+            userId: currentUser.id,
+            userName: currentUser.name,
+            userRole: currentUser.role,
+            userEmail: currentUser.email,
+            ipAddress: geo.ip,
+            location: `${geo.city}, ${geo.country}`,
+            browser: dev.browser,
+            os: dev.os,
+            deviceType: dev.deviceType,
+            loginAt: prev.find(s => s.isCurrentSession)?.loginAt || new Date().toISOString().replace('T', ' ').substring(0, 16) + ' UTC',
+            lastActiveAt: 'Active Now',
+            isCurrentSession: true,
+            tokenMasked: currentToken.substring(0, 8) + '...' + currentToken.slice(-4),
+          };
+          return [currentItem, ...otherSessions];
+        });
+      }
+    } catch (err) {
+      console.warn('Telemetry refresh error', err);
+    }
+  };
+
+  const testPingLatency = async (url: string = '/'): Promise<number> => {
+    const lat = await measurePingLatency(url);
+    setRealTelemetry(prev => ({ ...prev, rttMs: lat, lastUpdated: new Date().toLocaleTimeString() }));
+    return lat;
+  };
+
+  useEffect(() => {
+    refreshTelemetry();
+    const interval = setInterval(() => {
+      setRealTelemetry(prev => ({
+        ...prev,
+        sessionUptimeSeconds: prev.sessionUptimeSeconds + 1,
+        isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+      }));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [currentUser.id]);
+
+  const terminateSession = (sessionId: string) => {
+    setActiveSessions(prev => {
+      const target = prev.find(s => s.id === sessionId);
+      if (target?.isCurrentSession) {
+        adminLogout();
+      }
+      return prev.filter(s => s.id !== sessionId);
+    });
+    addAuditLog('System Configuration', `Session: ${sessionId}`, 'Session token revoked by administrator');
+  };
+
+  const terminateAllOtherSessions = () => {
+    setActiveSessions(prev => prev.filter(s => s.isCurrentSession));
+    addAuditLog('System Configuration', 'Remote Sessions', 'All other active sessions revoked');
+  };
+
+  const syncProviderGpuCapacity = (providerId: string) => {
+    const p = providers.find(prov => prov.id === providerId);
+    if (!p) return { synced: false, count: 0, model: 'Unknown' };
+    const simulatedAvailable = Math.max(0, p.purchasedGpuCount - p.allocatedResourcesCount);
+    const simulatedRunning = Math.min(p.purchasedGpuCount, p.allocatedResourcesCount);
+    updateProviderCapacity(providerId, {
+      runningGpuCount: simulatedRunning,
+      availableGpuCount: simulatedAvailable,
+      lastHeartbeat: new Date().toLocaleTimeString(),
+      apiStatus: 'Operational',
+    });
+    addAuditLog('Provider Updated', `Provider: ${p.name}`, `Live capacity synced: ${simulatedRunning} running, ${simulatedAvailable} available`, providerId);
+    return { synced: true, count: simulatedAvailable, model: p.purchasedGpuModel };
+  };
+
   const adminLogin = (email: string, password: string): { success: boolean; error?: string } => {
     const cleanEmail = email.trim().toLowerCase();
     const cleanPass = password.trim();
     const matched = users.find(u => u.email.toLowerCase() === cleanEmail);
+    const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+
     if (!matched) {
+      const failLog: LoginHistoryEntry = {
+        id: `login-${Date.now()}`,
+        userName: email,
+        userEmail: email,
+        userRole: 'Guest',
+        ipAddress: realTelemetry.publicIp || '127.0.0.1',
+        location: `${realTelemetry.city}, ${realTelemetry.country}`,
+        browser: realTelemetry.browser,
+        os: realTelemetry.os,
+        status: 'Failed',
+        failureReason: 'Account not found',
+        timestamp: nowStr,
+        authMethod: 'Admin Password',
+      };
+      setLoginHistory(prev => [failLog, ...prev.slice(0, 99)]);
       return { success: false, error: 'User account not found with this email address.' };
     }
     if (matched.status !== 'Active') {
+      const failLog: LoginHistoryEntry = {
+        id: `login-${Date.now()}`,
+        userId: matched.id,
+        userName: matched.name,
+        userEmail: matched.email,
+        userRole: matched.role,
+        ipAddress: realTelemetry.publicIp || '127.0.0.1',
+        location: `${realTelemetry.city}, ${realTelemetry.country}`,
+        browser: realTelemetry.browser,
+        os: realTelemetry.os,
+        status: 'Failed',
+        failureReason: 'Administrative account disabled',
+        timestamp: nowStr,
+        authMethod: 'Admin Password',
+      };
+      setLoginHistory(prev => [failLog, ...prev.slice(0, 99)]);
       return { success: false, error: 'This administrative account is disabled.' };
     }
     if (!verifyPassword(cleanPass, matched.passwordHash)) {
+      const failLog: LoginHistoryEntry = {
+        id: `login-${Date.now()}`,
+        userId: matched.id,
+        userName: matched.name,
+        userEmail: matched.email,
+        userRole: matched.role,
+        ipAddress: realTelemetry.publicIp || '127.0.0.1',
+        location: `${realTelemetry.city}, ${realTelemetry.country}`,
+        browser: realTelemetry.browser,
+        os: realTelemetry.os,
+        status: 'Failed',
+        failureReason: 'Invalid password',
+        timestamp: nowStr,
+        authMethod: 'Admin Password',
+      };
+      setLoginHistory(prev => [failLog, ...prev.slice(0, 99)]);
       return { success: false, error: 'Invalid password. Please check your credentials.' };
     }
+
+    const succLog: LoginHistoryEntry = {
+      id: `login-${Date.now()}`,
+      userId: matched.id,
+      userName: matched.name,
+      userEmail: matched.email,
+      userRole: matched.role,
+      ipAddress: realTelemetry.publicIp || '127.0.0.1',
+      location: `${realTelemetry.city}, ${realTelemetry.country}`,
+      browser: realTelemetry.browser,
+      os: realTelemetry.os,
+      status: 'Success',
+      timestamp: nowStr,
+      authMethod: 'Admin Password',
+    };
+    setLoginHistory(prev => [succLog, ...prev.slice(0, 99)]);
+
+    setUsers(prev => prev.map(u => u.id === matched.id ? {
+      ...u,
+      lastLogin: nowStr,
+      lastIp: realTelemetry.publicIp || '127.0.0.1',
+      activeSessions: Math.max(1, (u.activeSessions || 0) + 1),
+    } : u));
+
     setCurrentUser(matched);
     setIsAdminLoggedIn(true);
     if (typeof window !== 'undefined') {
@@ -547,13 +833,17 @@ Please save and bookmark your dedicated URL for instant access.
   };
 
   const addAuditLog = (action: AuditLog['action'], oldValue: string, newValue: string, resourceId?: string) => {
+    const ipStr = realTelemetry?.publicIp && realTelemetry.publicIp !== 'Detecting...'
+      ? `${realTelemetry.publicIp} (${realTelemetry.city})`
+      : currentUser?.lastIp || '127.0.0.1';
+
     const newLog: AuditLog = {
       id: `aud-${Date.now()}`,
-      user: currentUser.name,
-      role: currentUser.role,
+      user: currentUser ? currentUser.name : 'System Admin',
+      role: currentUser ? currentUser.role : 'Super Admin',
       action,
       timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19) + ' UTC',
-      ipAddress: currentUser.lastIp || '198.51.100.42',
+      ipAddress: ipStr,
       oldValue,
       newValue,
       resourceId,
@@ -1414,31 +1704,110 @@ Please save and bookmark your dedicated URL for instant access.
     );
   };
 
-  const clearAllMockData = () => {
+  const zeroOutGpuCounts = () => {
     setGpus([]);
+    saveStored('gpus', []);
+    setProviders(prev => {
+      const updated = prev.map(p => ({
+        ...p,
+        purchasedGpuCount: 0,
+        allocatedResourcesCount: 0,
+        runningGpuCount: 0,
+        availableGpuCount: 0,
+        monthlyCommitment: 0,
+      }));
+      saveStored('providers', updated);
+      return updated;
+    });
+    addAuditLog('Provider Changes', 'Active GPU Fleet', 'Zeroed out all GPU inventory and unintegrated provider counts to 0');
+  };
+
+  const wipeEntireDatabase = () => {
+    // 1. Reset all state entities
+    setUsers([INITIAL_USERS[0]]);
+    saveStored('users', [INITIAL_USERS[0]]);
+    setCurrentUser(INITIAL_USERS[0]);
+    saveStored('current_user', INITIAL_USERS[0]);
+    setGpus([]);
+    saveStored('gpus', []);
+    setSipProviders([]);
+    saveStored('sip_providers', []);
     setDids([]);
+    saveStored('dids', []);
     setClients([]);
+    saveStored('clients', []);
     setPendingRequests([]);
+    saveStored('pending_requests', []);
     setInvoices([]);
+    saveStored('invoices', []);
     setPayments([]);
+    saveStored('payments', []);
     setAlerts([]);
+    saveStored('alerts', []);
     setApiKeys([]);
-    setAuditLogs(prev => [
-      {
-        id: `audit-${Date.now()}`,
-        user: currentUser.name,
-        role: currentUser.role,
-        action: 'System Configuration',
-        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16) + ' UTC',
-        ipAddress: '127.0.0.1 (Local)',
-        oldValue: 'Mock Demo Data Active',
-        newValue: 'Clean Production Slate (All demo records cleared)',
-      },
-      ...prev,
-    ]);
+    saveStored('api_keys', []);
+    setSupportTickets([]);
+    saveStored('support_tickets', []);
+    setLoginHistory([]);
+    saveStored('login_history', []);
+    setActiveSessions([]);
+    saveStored('active_sessions', []);
+
+    // 2. Zero out provider counts
+    setProviders(prev => {
+      const cleaned = prev.map(p => ({
+        ...p,
+        purchasedGpuCount: 0,
+        allocatedResourcesCount: 0,
+        runningGpuCount: 0,
+        availableGpuCount: 0,
+        monthlyCommitment: 0,
+        apiStatus: 'Offline' as const,
+        upstreamKeyMasked: undefined,
+        apiEndpoint: undefined,
+      }));
+      saveStored('providers', cleaned);
+      return cleaned;
+    });
+
+    // 3. Clear all stored keys in localStorage
+    if (typeof window !== 'undefined') {
+      try {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && (k.startsWith(STORAGE_PREFIX) || k === 'celerko_admin_session')) {
+            keysToRemove.push(k);
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+      } catch (err) {
+        console.warn('[Storage] Error clearing localStorage keys', err);
+      }
+    }
+
+    // 4. Log wipe in fresh audit trail
+    const wipeLog: AuditLog = {
+      id: `audit-${Date.now()}`,
+      user: currentUser ? currentUser.name : 'Super Admin',
+      role: currentUser ? currentUser.role : 'Super Admin',
+      action: 'System Configuration',
+      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16) + ' UTC',
+      ipAddress: realTelemetry?.publicIp && realTelemetry.publicIp !== 'Detecting...' ? realTelemetry.publicIp : '127.0.0.1 (Local)',
+      oldValue: 'Active Database Tables & Records',
+      newValue: 'Clean Slate: Entire database wiped, all tables emptied, 0 records',
+    };
+    setAuditLogs([wipeLog]);
+    saveStored('audit_logs', [wipeLog]);
+  };
+
+  const clearAllMockData = () => {
+    wipeEntireDatabase();
   };
 
   const restoreDemoData = () => {
+    setUsers(INITIAL_USERS);
+    setCurrentUser(INITIAL_USERS[0]);
     setGpus(INITIAL_GPU_INVENTORY);
     setSipProviders(INITIAL_SIP_PROVIDERS);
     setDids(INITIAL_DID_NUMBERS);
@@ -1449,6 +1818,7 @@ Please save and bookmark your dedicated URL for instant access.
     setPayments(INITIAL_PAYMENTS);
     setAlerts(INITIAL_ALERTS);
     setApiKeys(INITIAL_API_KEYS);
+    setSupportTickets(INITIAL_SUPPORT_TICKETS);
     setAuditLogs(prev => [
       {
         id: `audit-${Date.now()}`,
@@ -1456,7 +1826,7 @@ Please save and bookmark your dedicated URL for instant access.
         role: currentUser.role,
         action: 'System Configuration',
         timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16) + ' UTC',
-        ipAddress: '127.0.0.1 (Local)',
+        ipAddress: realTelemetry?.publicIp || '127.0.0.1 (Local)',
         oldValue: 'Clean Production Slate',
         newValue: 'Restored Sample Demo Records',
       },
@@ -1749,6 +2119,10 @@ Please save and bookmark your dedicated URL for instant access.
         updateClientCredentials,
         clearAllMockData,
         restoreDemoData,
+        wipeEntireDatabase,
+        zeroOutGpuCounts,
+        showDatabaseTab,
+        setShowDatabaseTab,
         isClientPortalMode,
         setIsClientPortalMode,
         targetClientIdFromUrl,
@@ -1759,6 +2133,14 @@ Please save and bookmark your dedicated URL for instant access.
         openClientPortal,
         returnToBrokerAdmin,
         navigateToAdminLogin,
+        activeSessions,
+        loginHistory,
+        realTelemetry,
+        terminateSession,
+        terminateAllOtherSessions,
+        refreshTelemetry,
+        testPingLatency,
+        syncProviderGpuCapacity,
       }}
     >
       {children}

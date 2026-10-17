@@ -228,9 +228,10 @@ export const DashboardView: React.FC = () => {
           icon={PhoneCall}
         />
         <MetricCard
-          label="Unbilled Usage (Accrued)"
+          label="Unbilled Usage"
           value={totalUnbilledUsage > 0 ? formatINR(totalUnbilledUsage) : '₹0'}
-          badge="Pending Cycle"
+          subValue="Accrued (Pending Cycle)"
+          badge="Accrued"
         />
         <MetricCard
           label="Active Clients"

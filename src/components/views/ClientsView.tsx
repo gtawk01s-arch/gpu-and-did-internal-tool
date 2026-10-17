@@ -304,7 +304,7 @@ export const ClientsView: React.FC = () => {
         <MetricCard label="Monthly Client Billing" value={formatINR(totalRevenue)} subValue="Gross Run-Rate" highlight badge="Revenue" />
         <MetricCard label="Wholesale Upstream Cost" value={formatINR(totalCost)} subValue="Provider Commitments" badge="Cost" />
         <MetricCard label="Net Resale Profit" value={`+${formatINR(overallProfit)}`} subValue={`${totalRevenue > 0 ? overallMargin + '%' : '–'} Margin`} badge="Profit" />
-        <MetricCard label="Total Unbilled Usage" value={totalUnbilledUsage > 0 ? formatINR(totalUnbilledUsage) : '₹0'} subValue="Pending Cycle" badge="Unbilled" />
+        <MetricCard label="Unbilled Usage" value={totalUnbilledUsage > 0 ? formatINR(totalUnbilledUsage) : '₹0'} subValue="Pending Cycle" badge="Unbilled" />
       </div>
 
       {/* Dedicated Client Portal URLs & Access Banner */}

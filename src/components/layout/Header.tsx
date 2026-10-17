@@ -45,7 +45,11 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCommandPalette }) => {
     apiKeys,
     clearAllMockData,
     restoreDemoData,
+    wipeEntireDatabase,
+    zeroOutGpuCounts,
     adminLogout,
+    showDatabaseTab,
+    setShowDatabaseTab,
   } = useApp();
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [showAlertMenu, setShowAlertMenu] = useState(false);
@@ -65,8 +69,14 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCommandPalette }) => {
   ];
 
   const handleClearMockData = () => {
-    clearAllMockData();
-    setActionNotice('All sample mock data has been cleared! You now have a clean production slate with zero demo records.');
+    wipeEntireDatabase();
+    setActionNotice('Entire database wiped clean (0 records, all tables emptied). Clean production slate active.');
+    setTimeout(() => setActionNotice(null), 5000);
+  };
+
+  const handleZeroOutGpus = () => {
+    zeroOutGpuCounts();
+    setActionNotice('All GPU provider counts zeroed out to 0.');
     setTimeout(() => setActionNotice(null), 5000);
   };
 
@@ -188,7 +198,15 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCommandPalette }) => {
           )}
         </div>
 
-      
+        {/* Database & Data Source Manager Button */}
+        <button
+          onClick={() => setShowDataModal(true)}
+          className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-200 dark:border-slate-700"
+          title="Data Source & Database Management (Clear database, restore samples, toggle SQL schema tab)"
+        >
+          <Database className="w-3.5 h-3.5 text-cyan-500" />
+          <span className="hidden sm:inline">Data &amp; DB</span>
+        </button>
 
         {/* Theme Toggle */}
         <button
@@ -298,38 +316,90 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCommandPalette }) => {
             </div>
 
             {/* Instant UI Action Buttons */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="p-4 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/50 dark:bg-rose-950/20 space-y-2">
-                <div className="font-bold text-rose-800 dark:text-rose-300 flex items-center gap-1.5">
-                  <Trash2 className="w-4 h-4 text-rose-500" />
-                  <span>Clear All Mock Data</span>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-3.5 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/50 dark:bg-rose-950/20 space-y-2 flex flex-col justify-between">
+                <div>
+                  <div className="font-bold text-rose-800 dark:text-rose-300 flex items-center gap-1.5 text-xs">
+                    <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                    <span>Wipe Entire Database</span>
+                  </div>
+                  <p className="text-[11px] text-rose-700 dark:text-rose-400 leading-relaxed mt-1">
+                    Wipes all clients, GPUs, invoices, and sessions down to 0 records.
+                  </p>
                 </div>
-                <p className="text-[11px] text-rose-700 dark:text-rose-400 leading-relaxed">
-                  Wipes all demo clients, GPU nodes, invoices, and sample records. Gives you an empty canvas ready for real production entry.
-                </p>
                 <button
                   onClick={handleClearMockData}
-                  className="w-full py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg transition-colors shadow-xs"
+                  className="w-full py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg transition-colors text-xs shadow-xs"
                 >
-                  Clear All Demo Records
+                  Wipe Database
                 </button>
               </div>
 
-              <div className="p-4 rounded-xl border border-cyan-200 dark:border-cyan-900/60 bg-cyan-50/50 dark:bg-cyan-950/20 space-y-2">
-                <div className="font-bold text-cyan-800 dark:text-cyan-300 flex items-center gap-1.5">
-                  <RefreshCcw className="w-4 h-4 text-cyan-500" />
-                  <span>Restore Sample Data</span>
+              <div className="p-3.5 rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/50 dark:bg-amber-950/20 space-y-2 flex flex-col justify-between">
+                <div>
+                  <div className="font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5 text-xs">
+                    <Database className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Zero Out GPU Counts</span>
+                  </div>
+                  <p className="text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed mt-1">
+                    Removes all unintegrated GPU counts from providers and inventory.
+                  </p>
                 </div>
-                <p className="text-[11px] text-cyan-700 dark:text-cyan-400 leading-relaxed">
-                  Re-populates the complete demo dataset with Indian wholesale clients, GPU clusters, and sample invoices.
-                </p>
                 <button
-                  onClick={handleRestoreDemoData}
-                  className="w-full py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg transition-colors shadow-xs"
+                  onClick={handleZeroOutGpus}
+                  className="w-full py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-lg transition-colors text-xs shadow-xs"
                 >
-                  Restore Sample Dataset
+                  Zero GPU Counts
                 </button>
               </div>
+
+              <div className="p-3.5 rounded-xl border border-cyan-200 dark:border-cyan-900/60 bg-cyan-50/50 dark:bg-cyan-950/20 space-y-2 flex flex-col justify-between">
+                <div>
+                  <div className="font-bold text-cyan-800 dark:text-cyan-300 flex items-center gap-1.5 text-xs">
+                    <RefreshCcw className="w-3.5 h-3.5 text-cyan-500" />
+                    <span>Restore Sample Data</span>
+                  </div>
+                  <p className="text-[11px] text-cyan-700 dark:text-cyan-400 leading-relaxed mt-1">
+                    Re-populates demo wholesale clients, Indian DIDs, and sample invoices.
+                  </p>
+                </div>
+                <button
+                  onClick={handleRestoreDemoData}
+                  className="w-full py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg transition-colors text-xs shadow-xs"
+                >
+                  Restore Dataset
+                </button>
+              </div>
+            </div>
+
+            {/* Toggle / Remove Database Navigation Tab */}
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="font-bold text-slate-800 dark:text-slate-200 text-xs flex items-center gap-1.5">
+                  <Database className="w-4 h-4 text-cyan-500" />
+                  <span>SQL Schema (Read-Only) Tab in Navigation</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  {showDatabaseTab
+                    ? 'The PostgreSQL Database view is currently active in the left sidebar menu.'
+                    : 'The PostgreSQL Database view is currently hidden/removed from the sidebar menu.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDatabaseTab(!showDatabaseTab);
+                  setActionNotice(showDatabaseTab ? 'Database tab has been removed from sidebar navigation.' : 'Database tab has been restored to sidebar navigation.');
+                  setTimeout(() => setActionNotice(null), 4000);
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 self-start sm:self-auto ${
+                  showDatabaseTab
+                    ? 'bg-rose-100 hover:bg-rose-200 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300 dark:border-rose-800'
+                    : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                }`}
+              >
+                {showDatabaseTab ? 'Remove Database Tab' : 'Show Database Tab'}
+              </button>
             </div>
 
             {/* Permanent Code Explanation */}

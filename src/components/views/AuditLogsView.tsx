@@ -54,6 +54,8 @@ export const AuditLogsView: React.FC = () => {
 
   const actionTypes = Array.from(new Set(auditLogs.map(l => l.action)));
 
+  const distinctIps = Array.from(new Set(auditLogs.map(l => l.ipAddress).filter(Boolean)));
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -78,10 +80,10 @@ export const AuditLogsView: React.FC = () => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <MetricCard label="Total Audit Events" value={auditLogs.length} subValue="Logged in session" badge="Events" />
-        <MetricCard label="Active IP Endpoints" value="4 Verified IPs" subValue="Zero anomalous origins" badge="Security" />
+        <MetricCard label="Total Audit Events" value={auditLogs.length} subValue="Logged in persistent DB" badge="Events" />
+        <MetricCard label="Active IP Endpoints" value={`${distinctIps.length} Verified IP${distinctIps.length === 1 ? '' : 's'}`} subValue={distinctIps.length > 0 ? distinctIps.slice(0, 2).join(', ') : 'Live Gateway'} badge="Security" />
         <MetricCard label="Integrity Status" value="Cryptographic" subValue="SHA-256 chain verified" highlight badge="SOC-2" />
-        <MetricCard label="Retention Period" value="7 Years" subValue="Wholesale compliance policy" badge="Compliance" />
+        <MetricCard label="Retention Period" value="Permanent" subValue="Persistent database compliance" badge="Compliance" />
       </div>
 
       {/* Search and Action Filter */}
@@ -90,7 +92,7 @@ export const AuditLogsView: React.FC = () => {
           <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
           <input
             type="text"
-            placeholder="Search operator, IP address (198.51.100.X), resource ID, or delta..."
+            placeholder="Search operator, real IP address, resource ID, or delta..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-md text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 outline-hidden"

@@ -31,11 +31,13 @@ export const MetricCard: React.FC<MetricCardProps> = ({
           : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
       }`}
     >
-      <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1.5">
-        <span className="font-medium truncate">{label}</span>
-        <div className="flex items-center gap-1.5">
+      <div className="flex items-start justify-between gap-1.5 text-xs text-slate-500 dark:text-slate-400 mb-1.5">
+        <span className="font-medium leading-tight line-clamp-1 min-w-0 flex-1" title={label}>
+          {label}
+        </span>
+        <div className="flex items-center gap-1 shrink-0">
           {badge && (
-            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60 whitespace-nowrap">
               {badge}
             </span>
           )}

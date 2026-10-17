@@ -184,8 +184,18 @@ export const GpuManagementView: React.FC = () => {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
               {filteredGpus.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="py-8 text-center text-slate-400">
-                    No GPU nodes match the current filter criteria.
+                  <td colSpan={12} className="py-12 text-center text-slate-400">
+                    <div className="max-w-md mx-auto space-y-2">
+                      <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto text-slate-500">
+                        <Cpu className="w-5 h-5 text-cyan-500" />
+                      </div>
+                      <div className="font-semibold text-slate-800 dark:text-slate-200 text-sm">
+                        No Upstream GPU Nodes or Inventory Provisioned
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        You currently have not integrated upstream GPU cloud providers (0 GPUs active). Once you connect your provider API keys in the GPU Providers Desk, your synchronized cluster nodes will appear here.
+                      </p>
+                    </div>
                   </td>
                 </tr>
               ) : (
